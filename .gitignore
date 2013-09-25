@@ -1,8 +1,9 @@
-*.class
-
+.class
+.gradle/
+.classpath
 # Package Files #
 *.jar
 *.war
 *.ear
 
-*/.settings/
+**/.settings/
