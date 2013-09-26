@@ -1,11 +1,11 @@
 package org.brahms5.client.calendar
 
-import org.brahms5.client.AsyncClient;
+import org.brahms5.client.Client;
 
 class ClientCalendarManager {
-	AsyncClient mAsyncClient = null;
+	Client mAsyncClient = null;
 	
-	public ClientCalendarManager(AsyncClient client)
+	public ClientCalendarManager(Client client)
 	{
 		mAsyncClient = client;
 	}

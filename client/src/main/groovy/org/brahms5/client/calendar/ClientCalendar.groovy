@@ -1,16 +1,16 @@
 package org.brahms5.client.calendar
 
-import com.darylteo.rx.promises.Promise
-
-import org.brahms5.client.AsyncClient;
-import org.brahms5.common.TimeInterval;
+import org.brahms5.client.Client
+import org.brahms5.common.TimeInterval
 import org.brahms5.common.User
 import org.brahms5.common.calendar.Event
 
+import com.darylteo.rx.promises.Promise
+
 public class ClientCalendar {
-	AsyncClient mAsyncClient = null;
+	Client mAsyncClient = null;
 	
-	public ClientCalendar(AsyncClient client)
+	public ClientCalendar(Client client)
 	{
 		mAsyncClient = client;
 	}
