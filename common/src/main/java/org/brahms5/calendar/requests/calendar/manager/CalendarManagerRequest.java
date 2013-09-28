@@ -24,24 +24,12 @@ public class CalendarManagerRequest extends ARequest{
 		this.type = type;
 	}
 	public String getUsername() {
-		return username;
-	}
-	public void setUsername(String username) {
-		this.username = username;
-	}
-	public CalendarManagerRequest(String uuid, String id, Type type)
-	{
-		super(uuid, id);
-		this.type = type;
-	}
-	public CalendarManagerRequest(String uuid, String id, Type type, String username)
-	{
-		this(uuid, id, type);
-		this.username = username;
+		return getUser().getName();
 	}
 	public CalendarManagerRequest(String uuid, String id, Type type, User user)
 	{
-		this(uuid, id, type, user.getName());
+		super(uuid, id, user);
+		this.type = type;
 	}
 	@Override
 	public String toString()

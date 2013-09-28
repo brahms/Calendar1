@@ -2,16 +2,20 @@ package org.brahms5.calendar.requests;
 
 import java.io.Serializable;
 
+import org.brahms5.calendar.domain.User;
+
 @SuppressWarnings("serial")
 abstract public class ARequest implements Serializable {
 	
 	String uuid;
 	String id;
+	User user;
 	
-	public ARequest(String uuid, String id)
+	public ARequest(String uuid, String id, User user)
 	{
 		this.uuid = uuid;
 		this.id = id;
+		this.user = user;
 	}
 	
 	public String getQueue() 
@@ -38,6 +42,14 @@ abstract public class ARequest implements Serializable {
 	public String toString()
 	{
 		return String.format("%s[uuid: %s id: %s]", getClass().getSimpleName(), getUuid(), getId());
+	}
+
+	public User getUser() {
+		return user;
+	}
+
+	public void setUser(User user) {
+		this.user = user;
 	}
 
 }

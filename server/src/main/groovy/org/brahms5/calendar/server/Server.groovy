@@ -22,11 +22,15 @@ class Server {
 	HazelcastInstance mHazlecastBackend
 
 	IQueue mCalendarManagerQueue
+	IQueue mCalendarServiceQueue
 	IMap mCalendarMap
 	IMap mConnectMap
-	CalendarManager mCalendarManager
+	CalendarManagerService mCalendarManager
 	Thread mCalendarManagerThread
 	CalendarPersistor mCalendarPersistor
+	
+	Thread mCalendarServiceThread
+	CalendarService mCalendarService
 
 	ICalendarDao mCalendarDao
 	public Server() {
@@ -60,6 +64,9 @@ class Server {
 
 		log.trace "Getting CalendarManagerQueue"
 		mCalendarManagerQueue = mHazlecastFrontend.getQueue(Constants.QUEUE_CALENDAR_MANAGER)
+		
+		log.trace "Getting CalendarServiceQueue"
+		mCalendarServiceQueue = mHazlecastFrontend.getQueue(Constants.QUEUE_CALENDAR_SERVICE)
 
 		log.trace "Getting CalendarMap"
 		mCalendarMap = mHazlecastBackend.getMap(Constants.MAP_CALENDARS)
@@ -68,10 +75,12 @@ class Server {
 		mConnectMap = mHazlecastBackend.getMap(Constants.MAP_CONNECT)
 		
 		log.trace "Creating the CalendarManager"
-		mCalendarManager = new CalendarManager(mCalendarManagerQueue, mCalendarMap, mHazlecastFrontend, mConnectMap)
+		mCalendarManager = new CalendarManagerService(mCalendarManagerQueue, mCalendarMap, mHazlecastFrontend, mConnectMap)
 		
+		log.trace "Creating the CalendarService"
+		mCalendarService = new CalendarService(mCalendarServiceQueue, mCalendarMap, mConnectMap, mHazlecastFrontend)
 
-		log.trace "Starting the persistor"
+		log.trace "Starting the CalendarPersistor"
 		mCalendarPersistor = new CalendarPersistor(mCalendarDao, mHazlecastBackend.getLock(Constants.LOCK_STARTUP), mCalendarMap)
 		mCalendarPersistor.startup()
 		
@@ -79,6 +88,11 @@ class Server {
 		mCalendarManagerThread = new Thread(mCalendarManager)
 		mCalendarManagerThread.setDaemon(true)
 		mCalendarManagerThread.start()
+		
+		log.trace "Starting the CalendarService thread"
+		mCalendarServiceThread = new Thread(mCalendarService)
+		mCalendarServiceThread.setDaemon(true)
+		mCalendarServiceThread.start()
 
 	}
 
@@ -106,13 +120,26 @@ class Server {
 			}
 		}
 
-		return """CalendarManager Status: ${mCalendarManagerThread.isAlive()}
+		return """\
+======================================================================
+-------------------------STATUS---------------------------------------
+======================================================================
+
+CalendarManager Status: ${mCalendarManagerThread.isAlive()}
 CalendarManager Requests Served: ${mCalendarManager.getRequestsServed()}
+
+CalendarService Status: ${mCalendarServiceThread.isAlive()}
+CalendarService Requests Served: ${mCalendarServiceThread.getRequestsServed()}
+
 Calendars in DB: ${mCalendarDao.count()}
+
 Calendars in CalendarMap:
 ${builder.toString()}
+
 Clients logged in:
 ${builder2.toString()}
+
+======================================================================
 """
 	}
 }

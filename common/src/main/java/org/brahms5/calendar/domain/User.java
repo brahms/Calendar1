@@ -20,4 +20,14 @@ public class User implements Serializable {
 	{
 		return String.format("User[name: %s]", getName());
 	}
+	
+	public User()
+	{
+		
+	}
+	
+	public User(String name)
+	{
+		this.name = name;
+	}
 }

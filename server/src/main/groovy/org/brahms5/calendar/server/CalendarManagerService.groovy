@@ -19,16 +19,15 @@ import com.hazelcast.core.IMap
 import com.hazelcast.core.IQueue
 
 @Slf4j
-public class CalendarManager implements Runnable{
-	IQueue mRequests
+public class CalendarManagerService implements Runnable{
+	IQueue mCalendarManagerServiceQueue
 	IMap mCalendarMap
 	IMap mConnectMap
 	HazelcastInstance mFrontend
 	Integer requestsServed = 0
-	public boolean isShutdown = false
-	public CalendarManager(IQueue queue, IMap calendarMap, HazelcastInstance instance, IMap connectMap)
+	public CalendarManagerService(IQueue queue, IMap calendarMap, HazelcastInstance instance, IMap connectMap)
 	{
-		mRequests = queue
+		mCalendarManagerServiceQueue = queue
 		mCalendarMap = calendarMap
 		mFrontend = instance
 		mConnectMap = connectMap
@@ -43,8 +42,8 @@ public class CalendarManager implements Runnable{
 			
 			while(true)
 			{
-				log.trace "Taking a request from ${mRequests.getName()}"
-				CalendarManagerRequest request = mRequests.take()
+				log.trace "Taking a request from ${mCalendarManagerServiceQueue.getName()}"
+				CalendarManagerRequest request = mCalendarManagerServiceQueue.take()
 				log.trace "Got request: ${request.toString()}"
 				handleRequest(request)
 			}
