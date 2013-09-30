@@ -3,7 +3,7 @@ package org.brahms5.commons
 public interface Constants {
 	final def MAP_USERS = "userMap"
 	final def MAP_CALENDARS = "calendarMap"
-	final def MAP_CONNECT = "connectMap"
+	final def MAP_CONNECTIONS = "connectMap"
 	final def QUEUE_CALENDAR_MANAGER = "calendarManagerQueue"
 	final def QUEUE_CALENDAR_SERVICE = "calendarServiceQueue"
 	final def IDS_CLIENT = "clientIds"

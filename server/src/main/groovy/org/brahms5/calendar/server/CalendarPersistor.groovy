@@ -5,8 +5,9 @@ import groovy.util.logging.Slf4j
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 
-import org.brahms5.calendar.server.db.calendar.CalendarDao
 import org.brahms5.calendar.domain.Calendar
+import org.brahms5.calendar.server.db.calendar.CalendarDao
+import org.h2.engine.User
 
 import com.hazelcast.core.EntryEvent
 import com.hazelcast.core.EntryListener
@@ -19,6 +20,9 @@ class CalendarPersistor implements EntryListener {
 	CalendarDao mCalendarDao
 	ILock mStartupLock
 	IMap mCalendarMap
+	def trace = { str ->
+		log.trace str
+	}
 	
 	public CalendarPersistor(CalendarDao dao, ILock lock, IMap calendarMap)
 	{
@@ -30,27 +34,39 @@ class CalendarPersistor implements EntryListener {
 	
 	public void startup()
 	{
-		log.trace "startup() started"
-		def calendars = mCalendarDao.selectAll()
+		trace "startup() started"
 		
-		log.trace "locking"
+		trace "Selected all calendars"
+		final def calendars = mCalendarDao.selectAll()
+		
+		trace "Creating lookup table of calendar names for later"
+		final TreeSet names = new TreeSet()
+		calendars.each {
+			names.add(it.getUser().getName())
+		}
+		
+		trace "locking"
 		mStartupLock.lock()
 		try 
 		{
-			calendars.each {
-				cal -> 
+			
+			// for every calendar, see if we need to add a value
+			trace "Checking for any entries that don't exist in the map"
+			calendars.each { cal -> 
 				def key = cal.getUser().getName()
 				if (mCalendarMap.get(cal.getUser().getName()) == null)
 				{
-					log.trace "adding $key to CalendarMap"
+					trace "adding $key to CalendarMap"
 					mCalendarMap.put(cal.getUser().getName(), cal)
 				}
 				else 
 				{
-					log.trace "skipping $key, already exists"
+					trace "skipping $key, already exists"
 				}
 			}
-			log.trace "Finished adding list"
+			calendars = null
+			
+			trace "Finished adding list"
 		}
 		catch (ex)
 		{
@@ -58,12 +74,27 @@ class CalendarPersistor implements EntryListener {
 		}
 		finally
 		{
-			log.trace "Unlocking"
+			trace "Unlocking"
 			mStartupLock.unlock()
+			
+			trace "Adding myself as an entrylistener to ${mCalendarMap.getName()}"
+			mCalendarMap.addEntryListener(this, true)
+			
+			// now pickup any old values we are missing, we'll catch newer ones after they get added via our listner
+			trace "Checking for any new entries"
+			mCalendarMap.keySet().each { name ->
+				if (!names.contains(name)) {
+					trace "Inserting $name, didn't exist in local db."
+					try {
+						mCalendarDao.insert(mCalendarMap.get(name))
+					}
+					catch(ex) {
+						log.warn "Error inserting $name", ex
+					}
+				}
+			}
 		}
-		log.trace "Adding myself as an entrylistener to ${mCalendarMap.getName()}"
-		mCalendarMap.addEntryListener(this, true)
-		log.trace "startup() finished"
+		trace "startup() finished"
 	}
 	
 	
@@ -72,14 +103,14 @@ class CalendarPersistor implements EntryListener {
 	@Override
 	public void entryAdded(EntryEvent event) {
 		sExecutor.execute {
-			log.trace "Calendar added: ${event.key}"
+			trace "Calendar added: ${event.key}"
 			def addedCal = event.value as Calendar
 			
 			if (mCalendarDao.select(addedCal.getUser()) == null)
 			{
 				mCalendarDao.insert(addedCal)
 			}
-			log.trace "Finished add"
+			trace "Finished add"
 		}
 		
 	}
@@ -93,7 +124,7 @@ class CalendarPersistor implements EntryListener {
 	@Override
 	public void entryUpdated(EntryEvent event) {
 		sExecutor.execute {
-			log.trace "Calendar update: ${event.key}"
+			trace "Calendar update: ${event.key}"
 			def updatedCal = event.value as Calendar
 			
 			if (mCalendarDao.select(updatedCal.getUser()) == null)
@@ -104,7 +135,7 @@ class CalendarPersistor implements EntryListener {
 			{
 				mCalendarDao.update(updatedCal)
 			}
-			log.trace "Finished update"
+			trace "Finished update"
 		}
 		
 	}

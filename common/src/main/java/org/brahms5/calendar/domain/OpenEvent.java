@@ -21,6 +21,6 @@ public class OpenEvent extends Event{
 	@Override
 	public String toString()
 	{
-		return String.format("OpenEvent[events: %s, access: %s description: %s timeStart: %s timeEnd: %s]", getEvents().size(), getAccessControlMode(), getDescription(), getTimeStart(), getTimeEnd());
+		return String.format("OpenEvent[events: %s, access: %s description: %s timeInterval: %s]", getEvents().size(), getAccessControlMode(), getDescription(), getTimeInterval());
 	}
 }

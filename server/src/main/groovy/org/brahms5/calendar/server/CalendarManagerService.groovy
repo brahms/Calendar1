@@ -4,15 +4,14 @@ import groovy.util.logging.Slf4j
 
 import java.util.concurrent.TimeUnit
 
+import org.brahms5.calendar.domain.Calendar
 import org.brahms5.calendar.domain.User
-import org.brahms5.calendar.requests.calendar.manager.CalendarManagerRequest
-import org.brahms5.calendar.responses.AResponse;
+import org.brahms5.calendar.requests.ARequest
+import org.brahms5.calendar.requests.calendar.manager.*
+import org.brahms5.calendar.responses.Response
 import org.brahms5.calendar.responses.calendar.manager.ConnectResponse
 import org.brahms5.calendar.responses.calendar.manager.CreateResponse
 import org.brahms5.calendar.responses.calendar.manager.ListResponse
-import org.brahms5.calendar.server.db.calendar.CalendarDao;
-import org.brahms5.calendar.server.processors.CreateCalendarProcessor
-import org.brahms5.calendar.domain.Calendar
 
 import com.hazelcast.core.HazelcastInstance
 import com.hazelcast.core.IMap
@@ -22,84 +21,93 @@ import com.hazelcast.core.IQueue
 public class CalendarManagerService implements Runnable{
 	IQueue mCalendarManagerServiceQueue
 	IMap mCalendarMap
-	IMap mConnectMap
+	IMap mConnectionMap
 	HazelcastInstance mFrontend
 	Integer requestsServed = 0
-	public CalendarManagerService(IQueue queue, IMap calendarMap, HazelcastInstance instance, IMap connectMap)
+	final def trace = {
+		str -> log.trace str
+	}
+	public CalendarManagerService(IQueue queue, IMap calendarMap, HazelcastInstance instance, IMap connectionMap)
 	{
 		mCalendarManagerServiceQueue = queue
 		mCalendarMap = calendarMap
 		mFrontend = instance
-		mConnectMap = connectMap
-		log.trace "Constructor"
+		mConnectionMap = connectionMap
+		trace "Constructor"
 	}
 
 	@Override
 	public void run() {
-		log.trace "Starting run()"
+		trace "Starting run()"
 		try
 		{
 			
 			while(true)
 			{
-				log.trace "Taking a request from ${mCalendarManagerServiceQueue.getName()}"
-				CalendarManagerRequest request = mCalendarManagerServiceQueue.take()
-				log.trace "Got request: ${request.toString()}"
+				trace "Taking a request from ${mCalendarManagerServiceQueue.getName()}"
+				ARequest request = mCalendarManagerServiceQueue.take()
+				trace "Got request: ${request.toString()}"
 				handleRequest(request)
 			}
 			
 		}
 		catch (ex)
 		{
-			log.trace ex.toString()
+			trace ex.toString()
 		}
-		log.trace "Exiting run()"
+		trace "Exiting run()"
 	}
 	
-	protected void handleRequest(CalendarManagerRequest request)
+	void handleRequest(ARequest request)
 	{
-		log.trace "handleRequest(${request.toString()})"
-		switch (request.getType())
+		trace "handleRequest(${request.toString()})"
+		switch (request)
 		{
-			case Request.Type.LIST:
-				log.trace "Got a ListRequest request"
+			case ListRequest:
+				trace "Got a ListRequest request"
 				doList(request)
 				break
-			case Request.Type.CONNECT:
-				log.trace "Got a ConnectRequest"
+			case ConnectRequest:
+				trace "Got a ConnectRequest"
 				doConnect(request)
 				break
-			case Request.Type.CREATE:
-				log.trace "Got a CreateRequest"
+			case CreateRequest:
+				trace "Got a CreateRequest"
 				doCreate(request)
+				break
+			case DisconnectRequest:
+				trace "Got a DisconnectRequest"
+				doDisconnect(request)
+				break
+			default:
+				trace "Unknown Request"
 				break
 		}
 		requestsServed++
-		log.trace "handleRequest - $requestsServed request served"
+		trace "handleRequest - $requestsServed request served"
 	}
 	
-	protected void doCreate(CalendarManagerRequest request)
+	void doCreate(CreateRequest request)
 	{
-		log.trace "doCreate($request)"
-		log.trace "Response will be on: " + request.getQueue()
+		trace "doCreate($request)"
+		trace "Response will be on: " + request.getQueue()
 		
 		final def answerQueue = mFrontend.getQueue(request.getQueue())
-		User user = new User()
-		user.setName(request.getUsername())
+		final def user = request.getSubjectUser() ?: request.getClientUser()
 		mCalendarMap.lock(user.getName())
-		def cal = mCalendarMap.get(user.getName())
+		final def cal = mCalendarMap.get(user.getName())
 		try
 		{
 			if (cal == null) {
 				cal = new Calendar()
 				cal.setUser(user)
-				log.trace "Creating calendar: ${user.getName()}"
+				trace "Creating calendar: ${user.getName()}"
 				mCalendarMap.put(user.getName(), cal)
 				offer(new CreateResponse(request.getId(), null), answerQueue)
 			}
 			else {
-				log.trace "Already exists: ${user.getName()}"
-				offer(new CreateResponse(request.getId(), "The calendar already exists"), answerQueue)
+				trace "Already exists: ${user.getName()}"
+				offer(new CreateResponse(request.getId(), "${user.getName()}'s calendar already exists"), answerQueue)
 			}
 		}
 		finally
@@ -107,47 +115,51 @@ public class CalendarManagerService implements Runnable{
 			mCalendarMap.unlock(user.getName())
 		}
 	}
-	protected void doConnect(CalendarManagerRequest request)
+	void doConnect(ConnectRequest request)
 	{
-		log.trace "doConnect($request)"
-		log.trace "Response will be on: " + request.getQueue()
+		trace "doConnect($request)"
+		trace "Response will be on: " + request.getQueue()
 		final def answerQueue = mFrontend.getQueue(request.getQueue())
-		def cal = mCalendarMap.get(request.getUsername())
+		def cal = mCalendarMap.get(request.getSubjectUser().getName())
 		if (cal == null) {
 			offer(new ConnectResponse(request.getId(), "Doesn't exist"), answerQueue)
 		}
 		else {
-			mConnectMap.put(request.getUuid(), request.getUsername())
+			mConnectionMap.put(request.getUuid(), new ConnectionEntry(request.getClientUser(), request.getSubjectUser()))
 			offer(new ConnectResponse(request.getId(), null), answerQueue)
 		}
 	}
-	protected void doList(CalendarManagerRequest request)
+	void doList(ListRequest request)
 	{
-		log.trace "doList($request)"
-		log.trace "Response will be on: " + request.getQueue()
+		trace "doList($request)"
+		trace "Response will be on: " + request.getQueue()
 		final def answerQueue = mFrontend.getQueue(request.getQueue())
 		final List<User> users = mCalendarMap.keySet().asList().sort().collect({
 			name -> 
-				def user = new User()
-				user.setName(name)
+				return new User(name)
 		})
-		final AResponse response = new ListResponse(request.getId(), users);
+		final Response response = new ListResponse(request.getId(), users);
 		offer(response, answerQueue)
 		
 	}
 	
-	protected void offer(AResponse response, IQueue answerQueue)
+	void offer(Response response, IQueue answerQueue)
 	{
 		def offered = answerQueue.offer(response, 5, TimeUnit.SECONDS)
 		if (offered) {
-			log.trace "Response was offered"
+			trace "Response was offered"
 		}
 		else
 		{
-			log.trace "Response didn't go through"
+			trace "Response didn't go through"
 		}
 	}
-	
+	void doDisconnect(DisconnectRequest request)
+	{
+		trace "doDisconnet($request)"
+		mConnectionMap.remove(request.getUuid())
+		trace "removed ${request.getUuid()} from connection map"
+	}
 	public Integer getRequestsServed()
 	{
 		return requestsServed

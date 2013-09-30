@@ -2,12 +2,15 @@ package org.brahms5.calendar.server
 
 import groovy.util.logging.Slf4j
 
-import org.brahms5.calendar.requests.ARequest
+import java.util.concurrent.TimeUnit
 
-import com.hazelcast.core.HazelcastInstance;
+import org.brahms5.calendar.requests.ARequest
+import org.brahms5.calendar.requests.calendar.*
+import org.brahms5.calendar.responses.Response
+
+import com.hazelcast.core.HazelcastInstance
 import com.hazelcast.core.IMap
 import com.hazelcast.core.IQueue
-import org.brahms5.calendar.requests.calendar.*
 
 @Slf4j
 class CalendarService implements Runnable {
@@ -16,6 +19,11 @@ class CalendarService implements Runnable {
 	IMap mConnectMap
 	HazelcastInstance mHazlecastFrontend
 	Integer requestsServed = 0
+	
+	final def trace = 
+	{
+		str -> log.trace str
+	}
 	public CalendarService(IQueue serviceQueue, IMap calendarMap, IMap connectMap, HazelcastInstance instance)
 	{
 		mCalendarMap = calendarMap
@@ -25,52 +33,94 @@ class CalendarService implements Runnable {
 	}
 	@Override
 	public void run() {
-		log.trace "Starting run()"
+		trace "Starting run()"
 		try
 		{
 			
 			while(true)
 			{
-				log.trace "Taking a request from ${mRequests.getName()}"
+				trace "Taking a request from ${mCalendarServiceQueue.getName()}"
 				ARequest request = mCalendarServiceQueue.take()
-				log.trace "Got request: ${request.toString()}"
+				trace "Got request: ${request.toString()}"
 				handleRequest(request)
 			}
 			
 		}
 		catch (ex)
 		{
-			log.trace ex.toString()
+			trace ex.toString()
 		}
 		
 		requestsServed++
-		log.trace "Exiting run()"
+		trace "Exiting run()"
 	}
 	
 	public void handleRequest(ARequest request)
 	{
-		log.trace "handleRequest($request)"
+		trace "handleRequest($request)"
 		switch(request)
 		{
-			case RetrieveEventRequest:
-				doRetrieveEventRequest(request as RetrieveEventRequest)
+			case RetrieveScheduleRequest:
+				doRetrieveScheduleRequest(request as RetrieveScheduleRequest)
 				break;
 			case ScheduleEventRequest:
 				doScheduleEventRequest(request as ScheduleEventRequest)
 				break;
+			default:
+				trace "Unknown Request"
 		}
 	}
 	
-	protected doRetrieveEventRequest(RetrieveEventRequest request)
+	void doRetrieveScheduleRequest(RetrieveScheduleRequest request)
 	{
 		
 	}
 	
-	protected doScheduleEventRequest(ScheduleEventRequest request)
+	void doScheduleEventRequest(ScheduleEventRequest request)
 	{
-		
+		trace "doScheduleEventRequest($request)"
+		try
+		{
+			trace "Valiating event."
+			def event = request.getEvent()
+			event.validate()
+			
+			trace "Event validated."
+			
+			final def userList = request.getUserList()
+			
+			Set<String> names = new TreeSet()
+			userList.each {
+				user -> names.add(user.getName())
+			}
+			
+			
+			
+			
+		}
+		catch(ex)
+		{
+			log.warn "Unable to schedule event: " + ex.toString()
+		}
 	}
 	
+	void offer(Response response, String answerQueueName)
+	{
+		trace "Will offer response to: $answerQueueName"
+		def queue = mHazlecastFrontend.getQueue(answerQueueName)
+		if (queue == null) {
+			trace "$answerQueueName came back as null"
+		}
+		trace "Offering to: ${queue.getName()}"
+		def offered = queue.offer(response, 5, TimeUnit.SECONDS)
+		if (offered) {
+			trace "Response was offered"
+		}
+		else
+		{
+			trace "Response didn't go through"
+		}
+	}
 	public Integer getRequestsServed()
 	{
 		return requestsServed

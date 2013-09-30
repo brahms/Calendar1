@@ -1,14 +1,18 @@
 package org.brahms5.calendar.client
 
+import java.util.concurrent.TimeUnit;
+
 import groovy.util.logging.Slf4j
 
 import org.brahms5.calendar.domain.Event
 import org.brahms5.calendar.domain.TimeInterval
 import org.brahms5.calendar.domain.User
-import org.brahms5.calendar.requests.calendar.manager.CalendarManagerRequest
-import org.brahms5.calendar.requests.calendar.manager.CalendarManagerRequest.Type
+import org.brahms5.calendar.requests.ARequest
+import org.brahms5.calendar.requests.calendar.RetrieveScheduleRequest
+import org.brahms5.calendar.requests.calendar.ScheduleEventRequest
+import org.brahms5.calendar.requests.calendar.manager.*
+import org.brahms5.calendar.responses.Response
 import org.brahms5.calendar.responses.calendar.manager.ConnectResponse
-import org.brahms5.calendar.responses.calendar.manager.CreateResponse
 import org.brahms5.commons.Constants
 
 import com.hazelcast.client.HazelcastClient
@@ -24,16 +28,21 @@ import com.lightspeedworks.events.EventEmitter
 public class Client extends EventEmitter
 {	
 	HazelcastInstance mHazlecast = null;
-	Long mUuid
+	String mUuid
 	IQueue mAnswerQueue
 	MultiMap mUserMap
 	IQueue mCalendarManagerQueue
+	IQueue mCalendarServiceQueue
 	String mAnswerQueueName
-	String mUsername
+	User mClientUser
+	
+	final def trace = {
+		str -> log.trace str
+	}
 	public Client(String username)
 	{
-		mUsername = username
-		log.trace "Constructor"
+		mClientUser = new User(username)
+		trace "Constructor"
 	}
 	
 	public connect()
@@ -43,18 +52,20 @@ public class Client extends EventEmitter
 		cfg.getGroupConfig().setName(Constants.CLUSTER_FRONTEND)
 		mHazlecast = HazelcastClient.newHazelcastClient(cfg);
 		IdGenerator idGenerator = mHazlecast.getIdGenerator(Constants.IDS_CLIENT);
-		mUuid = "client-" + Long.toHexString(idGenerator.getId())
+		mUuid = "client-" + Long.toHexString(idGenerator.newId())
 		mAnswerQueueName = mUuid + ".answer"
 		
 		mAnswerQueue = mHazlecast.getQueue(mAnswerQueueName);
 		mCalendarManagerQueue = mHazlecast.getQueue(Constants.QUEUE_CALENDAR_MANAGER)
+		mCalendarServiceQueue = mHazlecast.getQueue(Constants.QUEUE_CALENDAR_SERVICE)
 		mUserMap = mHazlecast.getMultiMap(Constants.MAP_USERS)
-		mUserMap.put(mUsername, mAnswerQueueName)
+		mUserMap.put(mClientUser.getName(), mAnswerQueueName)
 		log.info "Answer queue is: $mAnswerQueueName"
 	}
 	
 	public shutdown()
 	{
+		disconnectCalendar()
 		try
 		{	
 			log.info "Destroying answer queue: ${mAnswerQueueName}"
@@ -66,13 +77,13 @@ public class Client extends EventEmitter
 		}
 		try
 		{
-			log.trace "Destroy multi map record for ${mUsername}, ${mAnswerQueueName}"
-			boolean b = mUserMap?.remove(mUsername, mAnswerQueueName)
+			trace "Destroy multi map record for ${mClientUser.getName()}, ${mAnswerQueueName}"
+			boolean b = mUserMap?.remove(mClientUser.getName(), mAnswerQueueName)
 			if (b) {
-				log.trace "Removed"
+				trace "Removed"
 			}
 			else {
-				log.trace "Failed to remove"
+				trace "Failed to remove"
 			}
 		}
 		catch (ex)
@@ -96,56 +107,104 @@ public class Client extends EventEmitter
 	
 	public connectCalendar(String username)
 	{
-		log.trace("connectCalendar($username)")
+		trace("connectCalendar($username)")
 		User user = new User()
 		user.setName(username)
 		
-		log.trace("Clearing answer queue: $mAnswerQueueName")
+		trace("Clearing answer queue: $mAnswerQueueName")
 		mAnswerQueue.clear();
 
-		final def req = new CalendarManagerRequest(mAnswerQueueName, UUID.randomUUID().toString(), Type.CONNECT, user)
-		log.trace("Created request with uuid of ${req.getId()}")
-		log.trace("Offering request...")
-		mCalendarManagerQueue.offer(req)
-		log.trace("Request taken")
-		log.trace("Taking response...")
-		ConnectResponse resp = mAnswerQueue.take()
-		log.trace("Received response: $resp")
+		final def req = new ConnectRequest(mUuid, UUID.randomUUID().toString(), mClientUser)
+		req.setSubjectUser(user)
+		ConnectResponse resp = sendRequest(req, mCalendarManagerQueue)
+		trace("Received response: $resp")
+		return resp.getError()
 	}
 	
 	public String createCalendar(String username)
 	{
-		log.trace("connectCalendar($username)")
+		trace("connectCalendar($username)")
 		User user = new User()
 		user.setName(username)
 		
-		log.trace("Clearing answer queue: $mAnswerQueueName")
+		trace("Clearing answer queue: $mAnswerQueueName")
 		mAnswerQueue.clear();
 
-		final def req = new CalendarManagerRequest(mAnswerQueueName, UUID.randomUUID().toString(), Type.CREATE, user)
-		log.trace("Created request with uuid of ${req.getId()}")
-		log.trace("Offering request to: " + mCalendarManagerQueue.getName())
-		mCalendarManagerQueue.offer(req)
-		log.trace("Request taken")
-		log.trace("Taking response...")
-		CreateResponse resp = mAnswerQueue.take()
-		log.trace("Received response: $resp")
+		final def req = new CreateRequest(mUuid, UUID.randomUUID().toString(), mClientUser)
+		req.setSubjectUser(new User(username))
+		Response resp = sendRequest(req, mCalendarManagerQueue)
+		trace("Received response: $resp")
 		return resp.getError() ?: "Success!"
 		
 	}
 	
-	public Event retrieveEvent(String username, TimeInterval timeInterval)
+	public List<User> listCalendars()
 	{
+		trace "listCalendars()"
 		
+		final def req = new ListRequest(mUuid, UUID.randomUUID().toString(), mClientUser)
+		
+		Response resp = sendRequest(req, mCalendarManagerQueue)
+		trace("Received response: $resp")
+		return resp.getError() ?: "Success!"
 	}
-	public Event retrieveEvent(TimeInterval timeInterval)
+	
+	public List<Event> retrieveSchedule(String username, TimeInterval timeInterval)
 	{
+		trace "retrieveSchedule($username, $timeInterval)"
+		def req = new RetrieveScheduleRequest(mUuid, UUID.randomUUID().toString(), mClientUser)
+		
+		req.setSubjectUser(username ? new User(username) : null )
+		req.setTimeInterval(timeInterval)
+		
+		Response resp = sendRequest(req, mCalendarServiceQueue)
+		trace("Received response: $resp")
+		return resp.getError() ?: "Success!"
+	}
+	public String scheduleEvent(List<String> users, Event event)
+	{
+		trace "scheduleEvent($users, $event)"
+		def req = new ScheduleEventRequest(mUuid, UUID.randomUUID().toString(), mClientUser)
+		
+		req.setUserList(users)
+		req.setEvent(event)
+		
+		Response resp = sendRequest(req, mCalendarServiceQueue)
+		trace("Received response: $resp")
+		return resp.getError() ?: "Success!"
 		
 	}
 	
-	public String scheduleEvent(List<String> users, Event event)
+	public void disconnectCalendar()
 	{
 		
+		try
+		{
+			log.info "Disconnecting from any Calendars"
+			mCalendarManagerQueue.offer(new DisconnectRequest(mUuid, UUID.randomUUID().toString(), mClientUser))
+		}
+		catch(ex)
+		{
+			log.warn "Error disconnecting from calendar", ex
+		}
+	}
+	
+	Response sendRequest(ARequest req, IQueue queue)
+	{
+		trace("Created request with request client id of ${req.getUuid()}")
+		trace("Created request with request id of ${req.getId()}")
+		trace("Offering request to queue: " + queue.getName())
+		queue.offer(req)
+		trace("Request taken by: ${queue.getName()}")
+		trace("Taking response from ${mAnswerQueue.getName()}...")
+		Response resp = mAnswerQueue.poll(2, TimeUnit.SECONDS)
+		
+		if (resp == null) {
+			log.warn("Timed out waiting for a response on ${mAnswerQueue.getName()}")
+			throw new Exception("Response timed out")
+		}
+		trace("Received $resp")
+		return resp
 	}
 	
 }

@@ -1,8 +1,8 @@
 package org.brahms5.calendar.responses.calendar.manager;
 
-import org.brahms5.calendar.responses.AResponse;
+import org.brahms5.calendar.responses.Response;
 
-public class ConnectResponse extends AResponse {
+public class ConnectResponse extends Response {
 
 	private static final long serialVersionUID = -2560300411380831336L;
 

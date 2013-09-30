@@ -26,6 +26,6 @@ public class GroupEvent extends Event {
 	@Override
 	public String toString()
 	{
-		return String.format("GroupEvent[access: %s description: %s timeStart: %s timeEnd: %s]", getAccessControlMode(), getDescription(), getTimeStart(), getTimeEnd());
+		return String.format("GroupEvent[access: %s description: %s timeInterval: %s]", getAccessControlMode(), getDescription(), getTimeInterval());
 	}
 }

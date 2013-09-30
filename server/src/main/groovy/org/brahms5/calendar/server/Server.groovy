@@ -24,7 +24,7 @@ class Server {
 	IQueue mCalendarManagerQueue
 	IQueue mCalendarServiceQueue
 	IMap mCalendarMap
-	IMap mConnectMap
+	IMap mConnectionMap
 	CalendarManagerService mCalendarManager
 	Thread mCalendarManagerThread
 	CalendarPersistor mCalendarPersistor
@@ -71,14 +71,14 @@ class Server {
 		log.trace "Getting CalendarMap"
 		mCalendarMap = mHazlecastBackend.getMap(Constants.MAP_CALENDARS)
 		
-		log.trace "Getting ConnectMap"
-		mConnectMap = mHazlecastBackend.getMap(Constants.MAP_CONNECT)
+		log.trace "Getting ConnectionMap"
+		mConnectionMap = mHazlecastBackend.getMap(Constants.MAP_CONNECTIONS)
 		
 		log.trace "Creating the CalendarManager"
-		mCalendarManager = new CalendarManagerService(mCalendarManagerQueue, mCalendarMap, mHazlecastFrontend, mConnectMap)
+		mCalendarManager = new CalendarManagerService(mCalendarManagerQueue, mCalendarMap, mHazlecastFrontend, mConnectionMap)
 		
 		log.trace "Creating the CalendarService"
-		mCalendarService = new CalendarService(mCalendarServiceQueue, mCalendarMap, mConnectMap, mHazlecastFrontend)
+		mCalendarService = new CalendarService(mCalendarServiceQueue, mCalendarMap, mConnectionMap, mHazlecastFrontend)
 
 		log.trace "Starting the CalendarPersistor"
 		mCalendarPersistor = new CalendarPersistor(mCalendarDao, mHazlecastBackend.getLock(Constants.LOCK_STARTUP), mCalendarMap)
@@ -119,7 +119,15 @@ class Server {
 				builder2.append("\tUser: $it, Client Answer Queue: $uuid\n")
 			}
 		}
-
+		
+		def connectionBuilder = new StringBuilder()
+		def connectMapEntrySet = mConnectionMap.entrySet()
+		connectMapEntrySet.each {
+			entry ->
+				def key = entry.getKey()
+				def val = entry.getValue() as ConnectionEntry
+				connectionBuilder.append("\t$key -> (${val.getClientUser()} ==> ${val.getSubjectUser()})\n");
+		}
 		return """\
 ======================================================================
 -------------------------STATUS---------------------------------------
@@ -129,15 +137,18 @@ CalendarManager Status: ${mCalendarManagerThread.isAlive()}
 CalendarManager Requests Served: ${mCalendarManager.getRequestsServed()}
 
 CalendarService Status: ${mCalendarServiceThread.isAlive()}
-CalendarService Requests Served: ${mCalendarServiceThread.getRequestsServed()}
+CalendarService Requests Served: ${mCalendarService.getRequestsServed()}
 
 Calendars in DB: ${mCalendarDao.count()}
 
-Calendars in CalendarMap:
+Calendars in CalendarMap (${connectMapEntrySet.size()}:
 ${builder.toString()}
 
 Clients logged in:
 ${builder2.toString()}
+
+Client Connections:
+${connectionBuilder.toString()}
 
 ======================================================================
 """

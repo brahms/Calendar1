@@ -9,13 +9,13 @@ abstract public class ARequest implements Serializable {
 	
 	String uuid;
 	String id;
-	User user;
+	User clientUser;
 	
-	public ARequest(String uuid, String id, User user)
+	public ARequest(String uuid, String id, User clientUser)
 	{
 		this.uuid = uuid;
 		this.id = id;
-		this.user = user;
+		this.clientUser = clientUser;
 	}
 	
 	public String getQueue() 
@@ -44,12 +44,12 @@ abstract public class ARequest implements Serializable {
 		return String.format("%s[uuid: %s id: %s]", getClass().getSimpleName(), getUuid(), getId());
 	}
 
-	public User getUser() {
-		return user;
+	public User getClientUser() {
+		return clientUser;
 	}
 
-	public void setUser(User user) {
-		this.user = user;
+	public void setClientUser(User user) {
+		this.clientUser = user;
 	}
 
 }

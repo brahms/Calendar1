@@ -1,11 +1,21 @@
 package org.brahms5.calendar.client;
 import groovy.util.logging.Slf4j
+
+import org.brahms5.calendar.domain.Event
+import org.brahms5.calendar.domain.GroupEvent
+import org.brahms5.calendar.domain.OpenEvent
+import org.brahms5.calendar.domain.User
+import org.brahms5.calendar.domain.Event.AccessControlMode
+
 import asg.cliche.Command
+import asg.cliche.Shell
+import asg.cliche.ShellDependent
 import asg.cliche.ShellFactory
 
 @Slf4j
-public class ClientMain {
+public class ClientMain implements ShellDependent{
 	Client mClient = null;
+	Shell mShell = null;
 	public static void main(String[] args) throws IOException {
 		new ClientMain().run();
 	}
@@ -20,11 +30,6 @@ public class ClientMain {
 	 *  CLI COMMANDS ARE BELOW
 	 * 
 	 */
-	@Command
-	public String status()
-	{
-		return "No status atm"
-	}
 	
 	@Command
 	public void exit()
@@ -53,12 +58,17 @@ public class ClientMain {
 	// Calendar Manager commands
 	
 	@Command
-	public String retrieveEvent()
+	public String listCalendars()
 	{
 		if (mClient == null) return "Please log in"
+		
 		try
 		{
-			return "Success"
+			def builder = new StringBuilder()
+			mClient.listCalendars().each {
+				builder.append("\t$it\n")
+			}
+			return builder.toString()
 		}
 		catch(ex)
 		{
@@ -68,7 +78,7 @@ public class ClientMain {
 	}
 
 	@Command
-	public String list()
+	public String whosLoggedIn()
 	{
 		if (mClient == null) return "Please log in"
 		try
@@ -93,8 +103,17 @@ public class ClientMain {
 		if (mClient == null) return "Please log in"
 		try
 		{
-			mClient.connectCalendar(user)
-			return "Success"
+			def error = mClient.connectCalendar(user)
+			if (error == null)
+			{
+				def shell = new CalendarServiceShell(mClient)
+				ShellFactory.createSubshell("$user", mShell, "", shell).commandLoop()
+				mClient.disconnectCalendar()
+			}
+			else 
+			{
+				return error
+			}
 		}
 		catch(ex)
 		{
@@ -109,104 +128,20 @@ public class ClientMain {
 		if (mClient == null) return "Please log in"
 		try
 		{
-			mClient.createCalendar(user)
-			return "Success"
+			return mClient.createCalendar(user)
 		}
 		catch(ex)
 		{
-			ex.printStackTrace()
-			return "ERROR"
+			return "ERROR: $ex"
 		}
+	}
+
+	@Override
+	public void cliSetShell(Shell shell) {
+		mShell = shell
+		
 	}
 	
-	
-	// Calendar methods
-	@Command
-	public String retrieveEvents(String user, String dateStart, String dateEnd)
-	{
-		if (mClient == null) return "Please log in"
-		try
-		{
-			return "Success"
-		}
-		catch(ex)
-		{
-			ex.printStackTrace()
-			return "ERROR"
-		}
-	}
-	
-	@Command
-	public String retrieveEvents(String dateStart, String dateEnd)
-	{
-		if (mClient == null) return "Please log in"
-		try
-		{
-			return "Success"
-		}
-		catch(ex)
-		{
-			ex.printStackTrace()
-			return "ERROR"
-		}
-	}
-	@Command
-	public String scheduleEvent( 
-		String dateStart,
-		String dateEnd, 
-		String description, 
-		String accessControl)
-	{
-		if (mClient == null) return "Please log in"
-		try
-		{
-			return "Success"
-		}
-		catch(ex)
-		{
-			ex.printStackTrace()
-			return "ERROR"
-		}
-	}
-	@Command
-	public String scheduleEvent(String userList, 
-		String dateStart,
-		String dateEnd, 
-		String description, 
-		String accessControl)
-	{
-		if (mClient == null) return "Please log in"
-		try
-		{
-			return "Success"
-		}
-		catch(ex)
-		{
-			ex.printStackTrace()
-			return "ERROR"
-		}
-	}
-	
-	
-	@Command
-	public String showLoggedInUsers()
-	{
-		if (mClient == null) return "Please log in"
-		try
-		{
-			def builder = new StringBuilder()
-			mClient.getLoggedInUsers().each {
-				builder.append("User: ${it}\n")
-			}
-			
-			return builder.toString()
-		}
-		catch (ex)
-		{
-			ex.printStackTrace()
-			return "ERROR"
-		}
-	}
 	
 	
 
