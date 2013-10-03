@@ -1,19 +1,57 @@
 package org.brahms5.calendar.client
 
-import java.util.Set;
+import groovy.util.logging.Slf4j
 
 import org.brahms5.calendar.domain.Event
 import org.brahms5.calendar.domain.GroupEvent
 import org.brahms5.calendar.domain.OpenEvent
+import org.brahms5.calendar.domain.TimeInterval
+import org.brahms5.calendar.domain.User
 import org.brahms5.calendar.domain.Event.AccessControlMode
 
 import asg.cliche.Command
 
 
-class EventCreationShell {
+@Slf4j
+public class EventCreationShell {
+	
+	Long getTime(String timeString) {
+		log.trace "Converting $timeString to date"
+		if (timeString.isNumber()) {
+			log.trace "It's a number."
+			return Long.parseLong(timeString)
+		}
+		else if(timeString.contains(".")){
+			def binding = new Binding();
+			def sh = new GroovyShell(binding)
+			def command = """\
+	use(groovy.time.TimeCategory) {
+	   return ${timeString}
+	}"""			
+			log.trace "Using command: $command"
+			try {
+				Date date =  sh.evaluate(command) as Date
+				log.trace "Evaluated: $date"
+				Long time = date.getTime();
+				log.trace "Returning $time"
+				return time
+			}
+			catch(ex) {
+				log.warn "Can't parse the command."
+				return null
+			}
+		}
+		else {
+			log.warn "Bad command."
+			println "Error can't parse: $timeString"
+			return null
+		}
+	}
+	
 	Event event = new Event()
 	Set<String> userList = new TreeSet<String>()
 	boolean canceled = true
+	User mOwner
 
 	@Command
 	public String setEventType(String eventType) {
@@ -42,18 +80,27 @@ class EventCreationShell {
 		println status()
 		return "Ok"
 	}
-	@Command
-	public void setTimeStart(Long time) {
-		event.getTimeInterval().setTimeStart(time)
-		canceled = false
-		println status()
+	
+	
+	public EventCreationShell(User owner) {
+		mOwner = owner;
+		event = new Event()
+		event.setOwner(mOwner)
 	}
-
+	
 	@Command
-	public void setTimeEnd(Long time) {
-		canceled = false
-		event.getTimeInterval().setTimeEnd(time)
-		println status()
+	public void setTime(String timeStartString, String timeEndString) {
+		Long timeStart = getTime(timeStartString)
+		Long timeEnd = getTime(timeEndString)
+		if (timeStart != null && timeEnd != null) {
+			log.trace "Setting event."
+			event.setTimeInterval(new TimeInterval(timeStart, timeEnd))
+			canceled = false
+			println status()
+		}
+		else {
+			log.trace "No time interval to set event with."
+		}
 	}
 
 	@Command
@@ -83,10 +130,8 @@ class EventCreationShell {
 		
 		usersStr = getUserList().isEmpty() ? "\tEmpty" : usersStr.toString()
 		return isCanceled() ? "Canceled" : """\
-Event:
-\tDescription: ${event.getDescription()}
-\tTimeInterval: ${event.getTimeInterval()}
-\tAccessControl: ${event.getAccessControlMode()}
+Event: 
+${event.debugString()}
 Users: 
 ${usersStr}
 """

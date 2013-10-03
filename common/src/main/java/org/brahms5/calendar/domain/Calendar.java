@@ -11,6 +11,29 @@ public class Calendar implements Serializable{
 	public List<Event> getEvents() {
 		return events;
 	}
+	/**
+	 * Returns a cleaned list of events for a user given an interval
+	 * @param user
+	 * @param interval
+	 * @return
+	 * @throws CloneNotSupportedException
+	 */
+	public List<Event> getEvents(User user, TimeInterval interval)
+	{
+		List<Event> returnedEvents = new ArrayList<Event>();
+		
+		for (Event event : getEvents()) 
+		{
+			if (interval.contains(event.getTimeInterval()) &&
+				event.canBeAccessedBy(user)) {
+				try {
+					returnedEvents.add(event.cleanFor(user));
+				} catch (CloneNotSupportedException e) {}
+			}
+		}
+		
+		return returnedEvents;
+	}
 	public void setEvents(List<Event> events) {
 		this.events = events;
 	}
@@ -27,5 +50,20 @@ public class Calendar implements Serializable{
 	{
 		return String.format("Calendar[user: %s events: %s]", getUser(), getEvents().size());
 	}
+	
+	public String debugString()
+	{
+		StringBuilder b = new StringBuilder();
+		
+		b.append(String.format("%s's Calendar (%d events)--------\n", getUser().getName(), getEvents().size()));
+		for (Event event : getEvents()) {
+			b.append(String.format("---------"));
+			b.append(event.debugString());
+			b.append(String.format("---------"));
+		}
+		
+		return b.toString();
+	}
+
 	
 }

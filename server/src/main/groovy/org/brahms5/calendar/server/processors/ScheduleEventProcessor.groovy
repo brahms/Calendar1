@@ -12,13 +12,13 @@ import com.hazelcast.map.EntryProcessor
 import org.brahms5.calendar.domain.*;
 
 @Slf4j
-public class CreateEventProcessor implements EntryProcessor, EntryBackupProcessor {
+public class ScheduleEventProcessor implements EntryProcessor, EntryBackupProcessor {
 
 	final def trace = {
 		str -> log.trace str
 	}
 	Event mEvent
-	public CreateEventProcessor(Event event)
+	public ScheduleEventProcessor(Event event)
 	{
 		mEvent = event
 	}
@@ -32,9 +32,15 @@ public class CreateEventProcessor implements EntryProcessor, EntryBackupProcesso
 		final def calendar = entry.getValue() as Calendar
 		final def user = new User(entry.getKey())
 		
-		calendar.getEvents().each { event ->
-			event.
+		if (event.addToCalendar(calendar)) {
+			trace "Adding $mEvent to calendar owned by $user"
+			entry.setValue(calendar)
 		}
+		else {
+			trace "Cannot add $mEvent to calendar owned by $user"
+		}
+		
+		return null
 	}
 
 	@Override

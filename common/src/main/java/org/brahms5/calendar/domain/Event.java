@@ -1,10 +1,17 @@
 package org.brahms5.calendar.domain;
 
 import java.io.Serializable;
+import java.util.Collections;
+import java.util.Date;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
-public class Event implements Serializable, Comparable<Event>{
-	public enum AccessControlMode{
+
+public class Event implements Serializable, Comparable<Event>, Cloneable{
+	protected Logger log = LoggerFactory.getLogger(getClass());
+	public enum AccessControlMode implements Cloneable{
 		PRIVATE,
 		PUBLIC,
 		GROUP,
@@ -29,12 +36,12 @@ public class Event implements Serializable, Comparable<Event>{
 	String description = "No Description";
 	AccessControlMode accessControlMode = AccessControlMode.PUBLIC;
 	String uuid = null;
-	User owner = null;
+	User owner = new User();
 	
 	@Override
 	public String toString()
 	{
-		return String.format("Event[access: %s description: %s timeInterval: %s]", getAccessControlMode(), getDescription(), getTimeInterval());
+		return String.format("Event[owner: %s, access: %s description: %s timeInterval: %s]", getOwner(), getAccessControlMode(), getDescription(), getTimeInterval());
 	}
 	
 	boolean conflictsWith(Event other)
@@ -67,10 +74,104 @@ public class Event implements Serializable, Comparable<Event>{
 		if (getTimeInterval().getTimeEnd() <= getTimeInterval().getTimeStart()) throw new Exception("TimeEnd <= TimeStart");
 		if (getDescription() == null) throw new Exception("Description is null");
 		if (getAccessControlMode() == null) throw new Exception("AccessControl is null");
+		if (getOwner() == null) throw new Exception("Owner is null");
 	}
 	@Override
 	public int compareTo(Event other) {
 		return getTimeInterval().compareTo(other.getTimeInterval());
+	}
+	public boolean canBeAccessedBy(User user) {
+		switch(getAccessControlMode())
+		{
+		case PRIVATE:
+			return user.equals(getOwner());
+		case PUBLIC:
+		case GROUP:
+		case OPEN:
+		default:
+			return true;
+		}
+	}
+	public User getOwner() 
+	{
+		return owner;
+	}
+	
+	public Event setOwner(User user)
+	{
+		this.owner = user;
+		return this;
+	}
+	
+	public boolean addTo(Calendar calendar)
+	{
+		log.trace(String.format("addTo(%s) this: %s", calendar, toString()));
+		switch(getAccessControlMode())
+		{
+		case PRIVATE:
+		case PUBLIC:
+		case OPEN:
+			if (getOwner().equals(calendar.getUser()))
+			{
+				log.trace("Can add because owner of calendar does equal this owner");
+				for (Event event : calendar.getEvents()) {
+					if(this.conflictsWith(event)) {
+						log.trace(String.format("Cannot add because my time interval conflicts with event %s", event));
+						return false;
+					}
+				}
+				log.trace("Adding.");
+				calendar.getEvents().add(this);
+				log.trace("Sorting.");
+				Collections.sort(calendar.getEvents());
+				log.trace("Done.");
+				return true;
+			}
+			else
+			{	
+				log.trace("Cannot add because owner of calendar does not equal this owner");
+				return false;
+				
+			}
+		default:
+			throw new UnsupportedOperationException();
+		}
+		
+	}
+
+	
+	@Override
+	public Event clone() throws CloneNotSupportedException {
+		return (Event) super.clone();
+	}
+	/**
+	 * Allows the event to scrub itself before being sent to a given user
+	 * @throws CloneNotSupportedException 
+	 */
+	public Event cleanFor(User user) throws CloneNotSupportedException
+	{
+		return clone();
+	}
+	public String debugString() {
+		return String.format(
+		"\tOwner %s\n" +
+		"\tType: %s\n" +
+		"\tDescription: %s\n" +
+		"\tTime: %s\n", 
+		(getOwner() != null) ? getOwner().getName() : "null", 
+		getAccessControlMode(), 
+		getDescription(),
+		(getTimeInterval() != null) ? getTimeInterval().debugString() : "null");
+	}
+	
+	public void setTimeInterval(Date start, Date end)
+	{
+		setTimeInterval(new TimeInterval(start, end));
+	}
+	
+	public void setTimeInterval(Long start, Long end)
+	{
+		setTimeInterval(new TimeInterval(start, end));
 	}
 }
 

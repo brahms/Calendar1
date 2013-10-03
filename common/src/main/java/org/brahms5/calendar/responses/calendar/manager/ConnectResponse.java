@@ -9,5 +9,8 @@ public class ConnectResponse extends Response {
 	public ConnectResponse(String id, String error) {
 		super(id, error);
 	}
+	public ConnectResponse(String id){
+		this(id, null);
+	}
 
 }

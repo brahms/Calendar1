@@ -5,6 +5,7 @@ import java.util.concurrent.TimeUnit;
 import groovy.util.logging.Slf4j
 
 import org.brahms5.calendar.domain.Event
+import org.brahms5.calendar.domain.GroupEvent
 import org.brahms5.calendar.domain.TimeInterval
 import org.brahms5.calendar.domain.User
 import org.brahms5.calendar.requests.ARequest
@@ -65,7 +66,6 @@ public class Client extends EventEmitter
 	
 	public shutdown()
 	{
-		disconnectCalendar()
 		try
 		{	
 			log.info "Destroying answer queue: ${mAnswerQueueName}"
@@ -168,6 +168,11 @@ public class Client extends EventEmitter
 		
 		req.setUserList(users)
 		req.setEvent(event)
+		
+		event.setOwner(mClientUser)
+		if (event instanceof GroupEvent) {
+			(event as GroupEvent).setMembers(users)
+		}
 		
 		Response resp = sendRequest(req, mCalendarServiceQueue)
 		trace("Received response: $resp")

@@ -20,10 +20,12 @@ class CalendarServiceShell implements ShellDependent{
 	}
 	Shell mShell
 	Client mClient
+	User mUser
 	
-	public CalendarServiceShell(Client client)
+	public CalendarServiceShell(Client client, User user)
 	{
 		mClient = client
+		mUser = user
 	}
 	
 	
@@ -32,7 +34,7 @@ class CalendarServiceShell implements ShellDependent{
 	public String createEvent()
 	{
 		log.trace "Creating event shell"
-		def shell = new EventCreationShell()
+		def shell = new EventCreationShell(mUser)
 		
 		ShellFactory.createSubshell("Event Creation", mShell, "", shell).commandLoop()
 		

@@ -7,6 +7,8 @@ import org.brahms5.calendar.domain.OpenEvent
 import org.brahms5.calendar.domain.User
 import org.brahms5.calendar.domain.Event.AccessControlMode
 
+import com.hazelcast.map.proxy.MapProxyImpl;
+
 import asg.cliche.Command
 import asg.cliche.Shell
 import asg.cliche.ShellDependent
@@ -16,6 +18,7 @@ import asg.cliche.ShellFactory
 public class ClientMain implements ShellDependent{
 	Client mClient = null;
 	Shell mShell = null;
+	User mUser = null;
 	public static void main(String[] args) throws IOException {
 		new ClientMain().run();
 	}
@@ -24,6 +27,7 @@ public class ClientMain implements ShellDependent{
 	{
         ShellFactory.createConsoleShell("CalendarClient", "", this)
             .commandLoop()
+			MapProxyImpl bla;
 	}
 	
 	/*
@@ -104,9 +108,10 @@ public class ClientMain implements ShellDependent{
 		try
 		{
 			def error = mClient.connectCalendar(user)
+			mUser = new User(user)
 			if (error == null)
 			{
-				def shell = new CalendarServiceShell(mClient)
+				def shell = new CalendarServiceShell(mClient, mUser)
 				ShellFactory.createSubshell("$user", mShell, "", shell).commandLoop()
 				mClient.disconnectCalendar()
 			}

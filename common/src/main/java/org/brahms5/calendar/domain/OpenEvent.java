@@ -23,4 +23,31 @@ public class OpenEvent extends Event{
 	{
 		return String.format("OpenEvent[events: %s, access: %s description: %s timeInterval: %s]", getEvents().size(), getAccessControlMode(), getDescription(), getTimeInterval());
 	}
+	@Override
+	public Event cleanFor(User user) throws CloneNotSupportedException {
+		OpenEvent cleanedEvent =  (OpenEvent) super.cleanFor(user);
+		List<GroupEvent> newList = new ArrayList<GroupEvent>(getEvents().size());
+		for (GroupEvent groupEvent : getEvents()) {
+			newList.add(groupEvent.cleanFor(user));
+		}
+		
+		cleanedEvent.setEvents(newList);
+		
+		return cleanedEvent;
+	}
+	
+	@Override
+	public String debugString()
+	{
+		StringBuilder b = new StringBuilder();
+		for (GroupEvent event : getEvents()) 
+		{
+			b.append(event.debugString() + "\n\n");
+		}
+		return super.toString() + b.toString();
+		
+	}
+	
+	
+	
 }

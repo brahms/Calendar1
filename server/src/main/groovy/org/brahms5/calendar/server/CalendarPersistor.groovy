@@ -7,7 +7,6 @@ import java.util.concurrent.Executors
 
 import org.brahms5.calendar.domain.Calendar
 import org.brahms5.calendar.server.db.calendar.CalendarDao
-import org.h2.engine.User
 
 import com.hazelcast.core.EntryEvent
 import com.hazelcast.core.EntryListener
@@ -117,8 +116,12 @@ class CalendarPersistor implements EntryListener {
 
 	@Override
 	public void entryRemoved(EntryEvent event) {
-		log.warn "HUH? Calendar removed: ${event.key}"
-		
+		sExecutor.execute {
+			
+			trace " Calendar removed: ${event.key}"
+			mCalendarDao.delete(event.key as String)
+			trace "Finished remove"
+		}
 	}
 
 	@Override
@@ -142,8 +145,7 @@ class CalendarPersistor implements EntryListener {
 
 	@Override
 	public void entryEvicted(EntryEvent event) {
-		log.warn "HUH? Calendar evicted: ${event.key}"
-		
+		trace "Calendar evicted: ${event.key}"
 	}
 	
 	private static final Executor sExecutor = Executors.newSingleThreadExecutor(); 

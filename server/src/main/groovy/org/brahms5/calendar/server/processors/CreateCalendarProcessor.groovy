@@ -9,6 +9,8 @@ import org.brahms5.calendar.domain.User
 
 import com.hazelcast.map.EntryBackupProcessor
 import com.hazelcast.map.EntryProcessor
+import com.hazelcast.map.proxy.MapProxyImpl;
+import com.hazelcast.map.record.ObjectRecord;
 
 @Slf4j
 public class CreateCalendarProcessor implements EntryProcessor, EntryBackupProcessor {
@@ -26,7 +28,8 @@ public class CreateCalendarProcessor implements EntryProcessor, EntryBackupProce
 			Calendar calendar = new Calendar()
 			calendar.setUser(mUser)
 			entry.setValue(calendar)
-			
+			MapProxyImpl prox;
+			ObjectRecord record;
 			return calendar
 		}
 		else

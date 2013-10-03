@@ -20,4 +20,6 @@ public interface ICalendarDao extends IDao{
 	List<Calendar> selectAll();
 	void insert(Calendar calendar);
 	Integer count();
+
+	void delete(String username);
 }

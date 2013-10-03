@@ -125,7 +125,6 @@ public class CalendarManagerService implements Runnable{
 			offer(new ConnectResponse(request.getId(), "Doesn't exist"), answerQueue)
 		}
 		else {
-			mConnectionMap.put(request.getUuid(), new ConnectionEntry(request.getClientUser(), request.getSubjectUser()))
 			offer(new ConnectResponse(request.getId(), null), answerQueue)
 		}
 	}
@@ -157,8 +156,6 @@ public class CalendarManagerService implements Runnable{
 	void doDisconnect(DisconnectRequest request)
 	{
 		trace "doDisconnet($request)"
-		mConnectionMap.remove(request.getUuid())
-		trace "removed ${request.getUuid()} from connection map"
 	}
 	public Integer getRequestsServed()
 	{

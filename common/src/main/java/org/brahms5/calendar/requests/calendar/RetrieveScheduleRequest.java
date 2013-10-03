@@ -2,14 +2,13 @@ package org.brahms5.calendar.requests.calendar;
 
 import org.brahms5.calendar.domain.TimeInterval;
 import org.brahms5.calendar.domain.User;
-import org.brahms5.calendar.requests.ARequest;
 
-public class RetrieveScheduleRequest extends ARequest{
+public class RetrieveScheduleRequest extends ACalendarRequest{
 
 	User subjectUser = null;
 	TimeInterval timeInterval = null;
-	public RetrieveScheduleRequest(String uuid, String id, User user) {
-		super(uuid, id, user);
+	public RetrieveScheduleRequest(String uuid, String id, User user, User subjectUser) {
+		super(uuid, id, user, subjectUser);
 		
 	}
 

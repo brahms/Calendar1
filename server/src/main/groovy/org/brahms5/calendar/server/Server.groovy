@@ -12,6 +12,7 @@ import com.hazelcast.config.MapConfig
 import com.hazelcast.config.MapConfig.InMemoryFormat
 import com.hazelcast.core.Hazelcast
 import com.hazelcast.core.HazelcastInstance
+import com.hazelcast.core.ILock
 import com.hazelcast.core.IMap
 import com.hazelcast.core.IQueue
 
@@ -25,6 +26,7 @@ class Server {
 	IQueue mCalendarServiceQueue
 	IMap mCalendarMap
 	IMap mConnectionMap
+	ILock mCalendarGlobalLock
 	CalendarManagerService mCalendarManager
 	Thread mCalendarManagerThread
 	CalendarPersistor mCalendarPersistor
@@ -61,7 +63,10 @@ class Server {
 		log.trace "Creating CalendarDao"
 		mCalendarDao = new CalendarDao()
 		mCalendarDao.setDataSource(dataSource);
-
+		
+		log.trace "Getting the global calendar lock"
+		mCalendarGlobalLock = mHazlecastBackend.getLock(Constants.LOCK_GLOBAL)
+		
 		log.trace "Getting CalendarManagerQueue"
 		mCalendarManagerQueue = mHazlecastFrontend.getQueue(Constants.QUEUE_CALENDAR_MANAGER)
 		
@@ -78,10 +83,10 @@ class Server {
 		mCalendarManager = new CalendarManagerService(mCalendarManagerQueue, mCalendarMap, mHazlecastFrontend, mConnectionMap)
 		
 		log.trace "Creating the CalendarService"
-		mCalendarService = new CalendarService(mCalendarServiceQueue, mCalendarMap, mConnectionMap, mHazlecastFrontend)
+		mCalendarService = new CalendarService(mCalendarServiceQueue, mCalendarMap, mConnectionMap, mHazlecastFrontend, mCalendarGlobalLock)
 
 		log.trace "Starting the CalendarPersistor"
-		mCalendarPersistor = new CalendarPersistor(mCalendarDao, mHazlecastBackend.getLock(Constants.LOCK_STARTUP), mCalendarMap)
+		mCalendarPersistor = new CalendarPersistor(mCalendarDao, mCalendarGlobalLock, mCalendarMap)
 		mCalendarPersistor.startup()
 		
 		log.trace "Starting CalendarManager thread"
@@ -93,6 +98,7 @@ class Server {
 		mCalendarServiceThread = new Thread(mCalendarService)
 		mCalendarServiceThread.setDaemon(true)
 		mCalendarServiceThread.start()
+		
 
 	}
 
@@ -152,5 +158,24 @@ ${connectionBuilder.toString()}
 
 ======================================================================
 """
+	}
+	
+	public Calendar getCalendar(String name)
+	{
+		return mCalendarMap.get(name)
+	}
+	
+	public List<Calendar> getAllCalendars()
+	{
+		return mCalendarMap.values().findAll().toList() as List<Calendar>
+	}
+	
+	public void obliterate()
+	{
+		mCalendarGlobalLock.lock()
+		mCalendarMap.keySet().each {
+			mCalendarMap.remove(it);
+		}
+		mCalendarGlobalLock.unlock()
 	}
 }
