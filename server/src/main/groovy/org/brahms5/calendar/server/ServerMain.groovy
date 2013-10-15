@@ -19,6 +19,7 @@ class ServerMain {
 		try
 		{
 			mServer = new Server();
+			createShutDownHook()
 		}
 		catch(ex)
 		{
@@ -82,5 +83,15 @@ class ServerMain {
 			log.warn "Error trying to obliterate", ex
 			"Error"
 		}
+	}
+	
+	private void createShutDownHook()
+	{
+		log.trace "Creating shutdown hook."
+		final def self = this
+		Runtime.getRuntime().addShutdownHook(new Thread({
+			log.trace "Shutting down server due to shutdown hook"
+			self.mServer?.shutdown()
+		}));
 	}
 }

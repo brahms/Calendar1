@@ -2,10 +2,11 @@ package org.brahms5.calendar.client
 
 import groovy.util.logging.Slf4j
 
+import org.brahms5.calendar.domain.GroupEvent
 import org.brahms5.calendar.domain.User
 
 import asg.cliche.Command
-import asg.cliche.Shell;
+import asg.cliche.Shell
 import asg.cliche.ShellDependent
 import asg.cliche.ShellFactory
 
@@ -40,13 +41,33 @@ class CalendarServiceShell implements ShellDependent{
 		
 		if (!shell.isCanceled()) {
 			def event = shell.getEvent()
-			def userList = shell.getUserList().collect {
-				return new User(it)
-			}
 			log.trace "Got back event: $event"
 			try { 
 				event.validate()
-				return mClient.scheduleEvent(userList, event)
+				return mClient.scheduleEvent(event)
+			}
+			catch (ex) {
+				return "ERROR: " + ex.toString()
+			}
+		}
+		else {
+			return "Canceled"
+		}
+	}
+	@Command
+	public String createGroupEvent()
+	{
+		log.trace "Creating group event shell"
+		def shell = new GroupEventCreationShell(mUser)
+		
+		ShellFactory.createSubshell("Group Event Creation", mShell, "", shell).commandLoop()
+		
+		if (!shell.isCanceled()) {
+			def event = shell.getEvent()
+			log.trace "Got back event: $event"
+			try {
+				event.validate()
+				return mClient.scheduleEvent(event)
 			}
 			catch (ex) {
 				return "ERROR: " + ex.toString()
@@ -61,11 +82,10 @@ class CalendarServiceShell implements ShellDependent{
 	@Command
 	public String retrieveSchedule()
 	{
-		def shell = new RetrieveScheduleShell()
+		def shell = new RetrieveScheduleShell(mUser)
 		ShellFactory.createSubshell("Retrieve Schedule", mShell, "", shell).commandLoop()
 	
 		if (!shell.isCanceled()) {
-			log.trace "Got back event: $shell"
 			try
 			{
 				return mClient.retrieveSchedule(shell.getUserName(), shell.getTimeInterval())
@@ -79,8 +99,7 @@ class CalendarServiceShell implements ShellDependent{
 		}
 	}
 
-
-
+	
 	@Override
 	public void cliSetShell(Shell shell) {
 		mShell = shell

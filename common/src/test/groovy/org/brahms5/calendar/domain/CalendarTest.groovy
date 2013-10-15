@@ -52,5 +52,32 @@ public class CalendarTest {
 		}
 	}
 	
+	@Test public void testRetrieveEvents()
+	{
+		
+		use(TimeCategory) {
+			Event e = new Event()
+			e.setAccessControlMode(AccessControlMode.PUBLIC)
+			e.setOwner(mUser)
+			e.setDescription("Test")
+			e.setTimeInterval(new TimeInterval(1.days.ago, 1.second.ago));
+			e.validate()
+			e.addTo(mCalendar)
+			
+			List<Event> events = mCalendar.getEvents(mUser, new TimeInterval(2.days.ago, 2.days.from.now));
+			assert events.size() == 1;
+			
+			e = new Event()
+			e.setAccessControlMode(AccessControlMode.OPEN)
+			e.setOwner(mUser)
+			e.setDescription("Test")
+			e.setTimeInterval(new TimeInterval(1.days.ago, 1.second.ago));
+			e.validate()
+			e.addTo(mCalendar)
+			
+		}
+	}
+	
+	
 	
 }

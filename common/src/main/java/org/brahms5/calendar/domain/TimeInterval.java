@@ -3,14 +3,28 @@ package org.brahms5.calendar.domain;
 import java.io.Serializable;
 import java.util.Date;
 
+import org.joda.time.Interval;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
+import org.joda.time.format.PeriodFormatter;
+import org.joda.time.format.PeriodFormatterBuilder;
 
 public class TimeInterval implements Serializable, Comparable<TimeInterval>, Cloneable{
 	private static final long serialVersionUID = 759086343646516787L;
 	Long timeStart = null;
 	Long timeEnd = null;
-	static DateTimeFormatter sDateFormatter = DateTimeFormat.forStyle("MM");
+	static DateTimeFormatter sDateFormatter = DateTimeFormat.forStyle("MS");
+	static PeriodFormatter sPeriodFormatter = new PeriodFormatterBuilder()
+    .appendYears().appendSuffix(" years ")
+    .appendMonths().appendSuffix(" months ")
+    .appendWeeks().appendSuffix(" weeks ")
+    .appendDays().appendSuffix(" days ")
+    .appendHours().appendSuffix(" hours ")
+    .appendMinutes().appendSuffix(" minutes ")
+    .appendSeconds().appendSuffix(" seconds")
+    .printZeroNever()
+    .toFormatter();
+
 	public Long getTimeStart() {
 		// TODO Auto-generated method stub
 		return timeStart;
@@ -47,8 +61,8 @@ public class TimeInterval implements Serializable, Comparable<TimeInterval>, Clo
 	
 	boolean intersects(TimeInterval other)
 	{
-		return (getTimeEnd() > other.getTimeStart() && getTimeStart() < other.getTimeStart()) ||
-				(getTimeEnd() > other.getTimeEnd() && getTimeStart() < other.getTimeEnd()) || 
+		return (getTimeEnd() >= other.getTimeStart() && getTimeStart() <= other.getTimeStart()) ||
+				(getTimeEnd() >= other.getTimeEnd() && getTimeStart() <= other.getTimeEnd()) || 
 				contains(other) ||
 				other.contains(this) || 
 				equals(other);
@@ -56,16 +70,18 @@ public class TimeInterval implements Serializable, Comparable<TimeInterval>, Clo
 	@Override
 	public String toString()
 	{
-		return String.format("TimeInterval[timeStart: %s, timeEnd: %s]", 
-				sDateFormatter.print(getTimeStart()), 
-				sDateFormatter.print(getTimeEnd()));
+		return String.format("TimeInterval[timeStart: %s, timeEnd: %s, interval: %s]", 
+				(getTimeStart() == null) ? "null" :  sDateFormatter.print(getTimeStart()), 
+			    (getTimeEnd() == null) ? "null" : sDateFormatter.print(getTimeEnd()),
+				(getInterval() == null ? "null" : sPeriodFormatter.print(getInterval().toPeriod())));
 	}
 	
 	public String debugString()
 	{
-		return String.format("%s to %s", 
-				sDateFormatter.print(getTimeStart()), 
-				sDateFormatter.print(getTimeEnd()));
+		return String.format("%s to %s (%s)", 
+				(getTimeStart() == null) ? "null" :  sDateFormatter.print(getTimeStart()), 
+				(getTimeEnd() == null) ? "null" :sDateFormatter.print(getTimeEnd()),
+				(getInterval() == null ? "null" : sPeriodFormatter.print(getInterval().toPeriod())));
 	}
 	@Override
 	public int compareTo(TimeInterval other) {
@@ -86,5 +102,10 @@ public class TimeInterval implements Serializable, Comparable<TimeInterval>, Clo
 	public TimeInterval clone() throws CloneNotSupportedException
 	{
 		return (TimeInterval) super.clone();
+	}
+	
+	public Interval getInterval()
+	{
+		return (null != getTimeEnd() && null != getTimeStart()) ? new Interval(getTimeStart(), getTimeEnd()) : null;
 	}
 }

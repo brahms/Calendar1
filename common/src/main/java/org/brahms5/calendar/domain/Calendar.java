@@ -55,11 +55,11 @@ public class Calendar implements Serializable{
 	{
 		StringBuilder b = new StringBuilder();
 		
-		b.append(String.format("%s's Calendar (%d events)--------\n", getUser().getName(), getEvents().size()));
+		b.append(String.format("--------%s's Calendar (%d events)--------\n", getUser().getName(), getEvents().size()));
 		for (Event event : getEvents()) {
-			b.append(String.format("---------"));
+			b.append(String.format("\n------------------------------------\n"));
 			b.append(event.debugString());
-			b.append(String.format("---------"));
+			b.append(String.format("\n------------------------------------\n"));
 		}
 		
 		return b.toString();

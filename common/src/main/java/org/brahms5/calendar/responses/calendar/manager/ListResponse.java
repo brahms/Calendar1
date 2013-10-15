@@ -8,7 +8,13 @@ import org.brahms5.calendar.responses.Response;
 public class ListResponse extends Response {
 
 	private static final long serialVersionUID = 6087807606048543945L;
-	public List<User> users;
+	List<User> users;
+	public List<User> getUsers() {
+		return users;
+	}
+	public void setUsers(List<User> users) {
+		this.users = users;
+	}
 	public ListResponse(String id, List<User> users) {
 		super(id, null);
 		this.users = users;

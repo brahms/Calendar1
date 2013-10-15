@@ -21,7 +21,7 @@ public class OpenEvent extends Event{
 	@Override
 	public String toString()
 	{
-		return String.format("OpenEvent[events: %s, access: %s description: %s timeInterval: %s]", getEvents().size(), getAccessControlMode(), getDescription(), getTimeInterval());
+		return String.format("OpenEvent[%s, Total Group Events: %s]", super.toString(), getEvents().size());
 	}
 	@Override
 	public Event cleanFor(User user) throws CloneNotSupportedException {
@@ -39,12 +39,12 @@ public class OpenEvent extends Event{
 	@Override
 	public String debugString()
 	{
-		StringBuilder b = new StringBuilder();
+		StringBuilder b = new StringBuilder("\tGroup Events:");
 		for (GroupEvent event : getEvents()) 
 		{
-			b.append(event.debugString() + "\n\n");
+			b.append("\n\t\t" + event.debugString().replace("\n", "\n\t\t") + "\n");
 		}
-		return super.toString() + b.toString();
+		return super.debugString() + b.toString();
 		
 	}
 	

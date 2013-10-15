@@ -79,6 +79,9 @@ public class CalendarManagerService implements Runnable{
 				trace "Got a DisconnectRequest"
 				doDisconnect(request)
 				break
+			case RetrieveCalendarRequest:
+				trace "Got a retrieve calendar request"
+				doRetrieveCalendar(request)
 			default:
 				trace "Unknown Request"
 				break

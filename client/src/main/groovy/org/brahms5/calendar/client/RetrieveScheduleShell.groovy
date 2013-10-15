@@ -1,28 +1,40 @@
 package org.brahms5.calendar.client
 
+import groovy.util.logging.Slf4j
+
 import org.brahms5.calendar.domain.TimeInterval
+import org.brahms5.calendar.domain.User
 
-import asg.cliche.Command;
+import asg.cliche.Command
 
-class RetrieveScheduleShell {
+@Slf4j
+class RetrieveScheduleShell extends AShell{
+	
 	TimeInterval timeInterval = new TimeInterval();
 	String userName = ""
 	boolean canceled = false
 
+	public RetrieveScheduleShell(User user) 
+	{
+		userName = user.getName()
+	}
 	@Command
-	public void setTimeStart(Long time) {
-		getTimeInterval().setTimeStart(time)
+	public void setTimeStart(String timeString) {
+		getTimeInterval().setTimeStart(getTime(timeString))
+		status()
 	}
 
 	@Command
-	public void setTimeEnd(Long time) {
-		getTimeInterval().setTimeEnd(time)
+	public void setTimeEnd(String timeString) {
+		getTimeInterval().setTimeEnd(getTime(timeString))
+		status()
 	}
 	
 	@Command
 	public void setUser(String name)
 	{
 		userName = name
+		status()
 	}
 	
 	public String getUser()
@@ -31,8 +43,9 @@ class RetrieveScheduleShell {
 	}
 	
 	@Command
-	String status() {
-		return "TimeInterval: $timeInterval, User: $userName"
+	public void status() {
+		println """User: $userName
+TimeInterval: ${timeInterval.debugString()}"""
 	}
 	
 	

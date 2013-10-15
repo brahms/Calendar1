@@ -1,18 +1,14 @@
 package org.brahms5.calendar.client;
 import groovy.util.logging.Slf4j
 
-import org.brahms5.calendar.domain.Event
-import org.brahms5.calendar.domain.GroupEvent
-import org.brahms5.calendar.domain.OpenEvent
 import org.brahms5.calendar.domain.User
-import org.brahms5.calendar.domain.Event.AccessControlMode
-
-import com.hazelcast.map.proxy.MapProxyImpl;
 
 import asg.cliche.Command
 import asg.cliche.Shell
 import asg.cliche.ShellDependent
 import asg.cliche.ShellFactory
+
+import com.hazelcast.map.proxy.MapProxyImpl
 
 @Slf4j
 public class ClientMain implements ShellDependent{
@@ -25,6 +21,7 @@ public class ClientMain implements ShellDependent{
 	
 	public void run() throws IOException
 	{
+		createShutDownHook()
         ShellFactory.createConsoleShell("CalendarClient", "", this)
             .commandLoop()
 			MapProxyImpl bla;
@@ -51,6 +48,7 @@ public class ClientMain implements ShellDependent{
 		{
 			mClient = new Client(user)
 			mClient.connect();
+			mUser = new User(user)
 			return "Logged in"
 		}
 		else
@@ -70,9 +68,9 @@ public class ClientMain implements ShellDependent{
 		{
 			def builder = new StringBuilder()
 			mClient.listCalendars().each {
-				builder.append("\t$it\n")
+				builder.append("\t${it.getName()}\n")
 			}
-			return builder.toString()
+			return "Calendars: \n" + builder.toString()
 		}
 		catch(ex)
 		{
@@ -102,23 +100,13 @@ public class ClientMain implements ShellDependent{
 	}
 	
 	@Command
-	public String connectCalendar(String user)
+	public String calendarServices()
 	{
 		if (mClient == null) return "Please log in"
 		try
 		{
-			def error = mClient.connectCalendar(user)
-			mUser = new User(user)
-			if (error == null)
-			{
-				def shell = new CalendarServiceShell(mClient, mUser)
-				ShellFactory.createSubshell("$user", mShell, "", shell).commandLoop()
-				mClient.disconnectCalendar()
-			}
-			else 
-			{
-				return error
-			}
+			def shell = new CalendarServiceShell(mClient, mUser)
+			ShellFactory.createSubshell("CalendarService", mShell, "", shell).commandLoop()
 		}
 		catch(ex)
 		{
@@ -147,7 +135,12 @@ public class ClientMain implements ShellDependent{
 		
 	}
 	
-	
-	
-
+	private void createShutDownHook()
+	{
+		final def self = this
+		Runtime.getRuntime().addShutdownHook(new Thread({
+			log.trace "Shutting down client due to shutdown hook"
+			self.mClient?.shutdown()
+		}));
+	}
 }

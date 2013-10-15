@@ -1,13 +1,13 @@
 package org.brahms5.calendar.domain;
 
-import static org.junit.Assert.*;
-import groovy.time.TimeCategory;
+import static org.junit.Assert.*
+import groovy.time.TimeCategory
 
-import org.brahms5.calendar.domain.Event.AccessControlMode;
-import org.junit.Before;
-import org.junit.Test;
+import org.brahms5.calendar.domain.Event.AccessControlMode
+import org.junit.Before
+import org.junit.Test
 
-class EventTest {
+class EventTest extends GroovyTestCase{
 	Event mTestEvent
 	Event mContainedEvent
 	Event mConflictEventBefore
@@ -97,12 +97,29 @@ class EventTest {
 		def cal = new Calendar()
 		cal.setUser(mOwner)
 		
-		assert mTestEvent.addTo(cal)
-		assert !mTestEvent.addTo(cal)
-		assert !mRandomEvent.addTo(cal)
-		assert !mConflictEventAfter.addTo(cal)
-		assert !mConflictEventBefore.addTo(cal)
-		assert !mContainedEvent.addTo(cal)
+		mTestEvent.addTo(cal)
+		shouldFail {
+			 mTestEvent.addTo(cal)
+		}
+		shouldFail {
+			 mRandomEvent.addTo(cal)
+		}
+		
+		shouldFail {
+			mConflictEventAfter.addTo(cal)
+		}
+		
+		shouldFail {
+			mConflictEventAfter.addTo(cal)
+		}
+		
+		shouldFail {
+			mConflictEventBefore.addTo(cal)
+		}
+		
+		shouldFail {
+			mContainedEvent.addTo(cal)
+		}
 	}
 
 }

@@ -2,6 +2,7 @@ package org.brahms5.calendar.server
 
 import groovy.util.logging.Slf4j
 
+import org.brahms5.calendar.domain.Calendar
 import org.brahms5.calendar.server.db.calendar.CalendarDao
 import org.brahms5.calendar.server.db.calendar.ICalendarDao
 import org.brahms5.commons.Constants
@@ -15,6 +16,7 @@ import com.hazelcast.core.HazelcastInstance
 import com.hazelcast.core.ILock
 import com.hazelcast.core.IMap
 import com.hazelcast.core.IQueue
+import com.hazelcast.core.ITopic
 
 
 @Slf4j
@@ -26,6 +28,7 @@ class Server {
 	IQueue mCalendarServiceQueue
 	IMap mCalendarMap
 	IMap mConnectionMap
+	ITopic mCalendarEvents
 	ILock mCalendarGlobalLock
 	CalendarManagerService mCalendarManager
 	Thread mCalendarManagerThread
@@ -79,11 +82,14 @@ class Server {
 		log.trace "Getting ConnectionMap"
 		mConnectionMap = mHazlecastBackend.getMap(Constants.MAP_CONNECTIONS)
 		
+		log.trace "Getting the Calendar Events Topic"
+		mCalendarEvents  = mHazlecastFrontend.getTopic(Constants.TOPIC_CALENDAR_EVENTS)
+		
 		log.trace "Creating the CalendarManager"
 		mCalendarManager = new CalendarManagerService(mCalendarManagerQueue, mCalendarMap, mHazlecastFrontend, mConnectionMap)
 		
 		log.trace "Creating the CalendarService"
-		mCalendarService = new CalendarService(mCalendarServiceQueue, mCalendarMap, mConnectionMap, mHazlecastFrontend, mCalendarGlobalLock)
+		mCalendarService = new CalendarService(mCalendarServiceQueue, mCalendarMap, mConnectionMap, mHazlecastFrontend, mCalendarGlobalLock, mCalendarEvents)
 
 		log.trace "Starting the CalendarPersistor"
 		mCalendarPersistor = new CalendarPersistor(mCalendarDao, mCalendarGlobalLock, mCalendarMap)
@@ -139,10 +145,10 @@ class Server {
 -------------------------STATUS---------------------------------------
 ======================================================================
 
-CalendarManager Status: ${mCalendarManagerThread.isAlive()}
+CalendarManager Is Alive: ${mCalendarManagerThread.isAlive()}
 CalendarManager Requests Served: ${mCalendarManager.getRequestsServed()}
 
-CalendarService Status: ${mCalendarServiceThread.isAlive()}
+CalendarService Is Alive: ${mCalendarServiceThread.isAlive()}
 CalendarService Requests Served: ${mCalendarService.getRequestsServed()}
 
 Calendars in DB: ${mCalendarDao.count()}
@@ -152,10 +158,6 @@ ${builder.toString()}
 
 Clients logged in:
 ${builder2.toString()}
-
-Client Connections:
-${connectionBuilder.toString()}
-
 ======================================================================
 """
 	}

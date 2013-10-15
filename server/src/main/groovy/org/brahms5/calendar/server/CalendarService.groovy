@@ -1,20 +1,22 @@
 package org.brahms5.calendar.server
 
+import groovy.time.TimeCategory;
 import groovy.util.logging.Slf4j
 
 import java.util.concurrent.TimeUnit
 
 import org.brahms5.calendar.domain.*
-import org.brahms5.calendar.domain.Event.AccessControlMode
+import org.brahms5.calendar.domain.Event.AccessControlMode;
 import org.brahms5.calendar.requests.calendar.*
 import org.brahms5.calendar.responses.Response
 import org.brahms5.calendar.responses.calendars.RetrieveScheduleResponse
-import org.brahms5.calendar.server.processors.ScheduleEventProcessor
+import org.brahms5.calendar.responses.calendars.ScheduleEventResponse
 
 import com.hazelcast.core.HazelcastInstance
 import com.hazelcast.core.ILock
 import com.hazelcast.core.IMap
 import com.hazelcast.core.IQueue
+import com.hazelcast.core.ITopic
 @Slf4j
 class CalendarService implements Runnable {
 	IQueue mCalendarServiceQueue
@@ -23,18 +25,20 @@ class CalendarService implements Runnable {
 	HazelcastInstance mHazlecastFrontend
 	Integer requestsServed = 0
 	ILock mCalendarGlobalLock
+	ITopic mCalendarEvents
 	
 	final def trace = 
 	{
 		str -> log.trace str
 	}
-	public CalendarService(IQueue serviceQueue, IMap calendarMap, IMap connectMap, HazelcastInstance instance, ILock globalLock)
+	public CalendarService(IQueue serviceQueue, IMap calendarMap, IMap connectMap, HazelcastInstance instance, ILock globalLock, ITopic calendarEvents)
 	{
 		mCalendarMap = calendarMap
 		mCalendarServiceQueue = serviceQueue
 		mConnectMap = connectMap
 		mHazlecastFrontend  = instance
 		mCalendarGlobalLock = globalLock
+		mCalendarEvents = calendarEvents
 	}
 	@Override
 	public void run() {
@@ -78,17 +82,15 @@ class CalendarService implements Runnable {
 	
 	void doRetrieveScheduleRequest(RetrieveScheduleRequest request)
 	{
-		final User clientUser = request.getClientUser()
-		final User subjectUser = request.getSubjectUser()
-		final Calendar calendar = getCalendar(clientUser, subjectUser)
+		final Calendar calendar = getCalendar(request)
 		final TimeInterval timeInterval = request.getTimeInterval()
 		RetrieveScheduleResponse response = null
 		if (calendar == null)  {
-			 response = new RetrieveScheduleResponse(request.getId(), null)
+			 response = new RetrieveScheduleResponse(request.getId(), "Calendar doesn't exist.")
 		}
 		else {
-			response = new RetrieveScheduleResponse(request.getId(), "Calendar doesn't exist.")
-			response.setEvents(calendar.getEvents(clientUser, timeInterval))
+			response = new RetrieveScheduleResponse(request.getId(), null)
+			response.setEvents(calendar.getEvents(request.getClientUser(), timeInterval))
 		}
 		
 		offer(response, request.getQueue())
@@ -109,40 +111,77 @@ class CalendarService implements Runnable {
 			trace "locking"
 			mCalendarGlobalLock.lock();
 			trace "locked"
-			switch (event.getAccessControlMode()) 
+			
+			def error = null
+			try 
 			{
-				case AccessControlMode.PUBLIC:
-				case AccessControlMode.PRIVATE:
-				case AccessControlMode.OPEN:
-					def cal = mCalendarMap.get(event.getOwner().getName())
-					trace "Trying to add to $cal"
-					def added = event.addTo(cal)
-					trace ("Added: $added")
-					mCalendarMap.replace(event.getOwner().getName(), cal)
-					trace "Updated map"
-					break;
-				case AccessControlMode.GROUP:
-					def groupEvent = event as GroupEvent
-					trace "Group event"
-					def results = mCalendarMap.getAll(groupEvent.getMembers().toSet()).collect({
-						trace "Trying to add to $it."
-						def added = groupEvent.addTo(it)
-						trace "Did we actually add: $added."
-						mCalendarMap.replace(it.getKey(), cal)
-						trace "Updated map."
+				switch (event.getAccessControlMode()) 
+				{
+					case AccessControlMode.PUBLIC:
+					case AccessControlMode.PRIVATE:
+					case AccessControlMode.OPEN:
+						def cal = mCalendarMap.get(event.getOwner().getName())
+						trace "Trying to add to $cal"
+						event.addTo(cal)
+						mCalendarMap.replace(event.getOwner().getName(), cal)
+						trace "Updated map"
+						break;
+					case AccessControlMode.GROUP:
 						
-						return added
-					})
-					
-					def addedAtAll = results.findAll()
-					
-					trace "Tried to add to ${results.size()} calendars. Actually added to ${addedAtAll}.size() calendars"
-					break;
+						final def groupEvent = event as GroupEvent
+						
+						trace "Trying to add event: $groupEvent"
+						
+						final def keys = groupEvent.getMembers().collect({return it.getName()}).toSet()
+						
+						def results = mCalendarMap.getAll(keys).collect({
+							final def key = it.key
+							final Calendar cal = it.value
+							
+							trace "Trying to add to ${key}'s calendar"
+							final def added = {
+								try {
+									groupEvent.addTo(cal)
+									mCalendarMap.replace(key, cal)
+									trace "Updated map."
+									trace "Publishing event"
+									def calendarEvent = new CalendarEvent()
+									calendarEvent.setClientUser(request.getClientUser())
+									calendarEvent.setSubjectUser(cal.getUser())
+									calendarEvent.setClientUuid(request.getUuid())
+									calendarEvent.setTimestamp(System.currentTimeMillis())
+									mCalendarEvents.publish(calendarEvent)
+									trace "Event published"
+									return true
+								}
+								catch (ex) {
+									log.trace "Unable to add to $key"
+									error = error?:"";
+									error += ex.toString() +"\n"
+									return false
+								}
+							}.call()
+							return added
+						})
+						
+						def addedAtAll = results.findAll()
+						
+						trace "Tried to add to ${results.size()} calendars. Actually added to ${addedAtAll.size()} calendars"
+						break;
+				}
 			}
-			trace "unlocking"
-			mCalendarGlobalLock.unlock();
-			trace "unlocked"
-			offer(new Response(request.getId(), null), request.getQueue())
+			catch (ex) 
+			{
+				error = ex.toString();
+				log.warn "Exception scheduling", ex
+			}
+			finally
+			{
+				trace "unlocking"
+				mCalendarGlobalLock.unlock();
+				trace "unlocked"
+			}
+			offer(new ScheduleEventResponse(request.getId(), error), request.getQueue())
 		}
 		catch(ex)
 		{
@@ -151,7 +190,7 @@ class CalendarService implements Runnable {
 				trace "Unlocking global lock after exception"
 				mCalendarGlobalLock.unlock()
 			} catch(ex2){}
-			offer(new Response(request.getId(), ex.toString()), request.getQueue())
+			offer(new ScheduleEventResponse(request.getId(), ex.toString()), request.getQueue())
 		}
 	}
 	

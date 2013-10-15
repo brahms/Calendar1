@@ -10,6 +10,31 @@ import org.slf4j.LoggerFactory;
 
 
 public class Event implements Serializable, Comparable<Event>, Cloneable{
+	
+	public static class ConflictingEventException extends Exception
+	{
+		private static final long serialVersionUID = 4157523418773776285L;
+		private Event conflictingEvent;
+		
+		public ConflictingEventException(Event other)
+		{
+			this.setConflictingEvent(other);
+		}
+
+		public Event getConflictingEvent() {
+			return conflictingEvent;
+		}
+		
+		@Override
+		public String toString()
+		{
+			return String.format("Cannot add due to conflicting event: " + conflictingEvent.toString());
+		}
+
+		protected void setConflictingEvent(Event conflictingEvent) {
+			this.conflictingEvent = conflictingEvent;
+		}
+	}
 	protected Logger log = LoggerFactory.getLogger(getClass());
 	public enum AccessControlMode implements Cloneable{
 		PRIVATE,
@@ -103,7 +128,7 @@ public class Event implements Serializable, Comparable<Event>, Cloneable{
 		return this;
 	}
 	
-	public boolean addTo(Calendar calendar)
+	public void addTo(Calendar calendar) throws Exception, ConflictingEventException
 	{
 		log.trace(String.format("addTo(%s) this: %s", calendar, toString()));
 		switch(getAccessControlMode())
@@ -117,7 +142,7 @@ public class Event implements Serializable, Comparable<Event>, Cloneable{
 				for (Event event : calendar.getEvents()) {
 					if(this.conflictsWith(event)) {
 						log.trace(String.format("Cannot add because my time interval conflicts with event %s", event));
-						return false;
+						throw new ConflictingEventException(event);
 					}
 				}
 				log.trace("Adding.");
@@ -125,12 +150,13 @@ public class Event implements Serializable, Comparable<Event>, Cloneable{
 				log.trace("Sorting.");
 				Collections.sort(calendar.getEvents());
 				log.trace("Done.");
-				return true;
+				return;
 			}
 			else
 			{	
-				log.trace("Cannot add because owner of calendar does not equal this owner");
-				return false;
+				String error = "Cannot add because owner of calendar does not equal this owner";
+				log.trace(error);
+				throw new Exception(error);
 				
 			}
 		default:

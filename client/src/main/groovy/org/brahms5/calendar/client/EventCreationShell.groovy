@@ -3,7 +3,6 @@ package org.brahms5.calendar.client
 import groovy.util.logging.Slf4j
 
 import org.brahms5.calendar.domain.Event
-import org.brahms5.calendar.domain.GroupEvent
 import org.brahms5.calendar.domain.OpenEvent
 import org.brahms5.calendar.domain.TimeInterval
 import org.brahms5.calendar.domain.User
@@ -13,44 +12,11 @@ import asg.cliche.Command
 
 
 @Slf4j
-public class EventCreationShell {
-	
-	Long getTime(String timeString) {
-		log.trace "Converting $timeString to date"
-		if (timeString.isNumber()) {
-			log.trace "It's a number."
-			return Long.parseLong(timeString)
-		}
-		else if(timeString.contains(".")){
-			def binding = new Binding();
-			def sh = new GroovyShell(binding)
-			def command = """\
-	use(groovy.time.TimeCategory) {
-	   return ${timeString}
-	}"""			
-			log.trace "Using command: $command"
-			try {
-				Date date =  sh.evaluate(command) as Date
-				log.trace "Evaluated: $date"
-				Long time = date.getTime();
-				log.trace "Returning $time"
-				return time
-			}
-			catch(ex) {
-				log.warn "Can't parse the command."
-				return null
-			}
-		}
-		else {
-			log.warn "Bad command."
-			println "Error can't parse: $timeString"
-			return null
-		}
-	}
+public class EventCreationShell extends AShell{
+
 	
 	Event event = new Event()
-	Set<String> userList = new TreeSet<String>()
-	boolean canceled = true
+	boolean canceled = false
 	User mOwner
 
 	@Command
@@ -65,9 +31,6 @@ public class EventCreationShell {
 				event = new Event()
 				event.setAccessControlMode(AccessControlMode.PRIVATE)
 				break
-			case "group":
-				event = new GroupEvent()
-				break
 			case "public":
 				event = new Event()
 				event.setAccessControlMode(AccessControlMode.PUBLIC)
@@ -77,6 +40,7 @@ public class EventCreationShell {
 		}
 		event.setDescription(oldEvent.getDescription())
 		event.setTimeInterval(oldEvent.getTimeInterval())
+		event.setOwner(mOwner);
 		println status()
 		return "Ok"
 	}
@@ -115,25 +79,16 @@ public class EventCreationShell {
 	public void clear()
 	{
 		canceled = false
-		event = new Event()
-		clearUsers()
+		event = event.getClass().newInstance()
+		event.setOwner(mOwner)
 		println status()
 	}
 
 	@Command
-	String status() {
-		def usersStr = new StringBuilder()
-		
-		getUserList().each {
-			usersStr.append("\t$it\n")
-		}
-		
-		usersStr = getUserList().isEmpty() ? "\tEmpty" : usersStr.toString()
+	public String status() {
 		return isCanceled() ? "Canceled" : """\
 Event: 
 ${event.debugString()}
-Users: 
-${usersStr}
 """
 	}
 
@@ -143,32 +98,6 @@ ${usersStr}
 		return "You have to type exit to stop the shell"
 	}
 	
-	@Command
-	public void addUser(String username) {
-		userList.add(username);
-		canceled = false
-		println status()
-	}
-
-	@Command
-	public void removeUser(String username) {
-		userList.remove(username);
-		canceled = false
-		println status()
-	}
-
-	@Command
-	public void clearUsers() {
-		userList.clear();
-		canceled = false
-		println status()
-	}
-
-	
-	public Set<String>getUserList()
-	{
-		return userList
-	}
 	
 	boolean isCanceled()
 	{

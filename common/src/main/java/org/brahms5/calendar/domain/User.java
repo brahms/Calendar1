@@ -2,7 +2,7 @@ package org.brahms5.calendar.domain;
 
 import java.io.Serializable;
 
-public class User implements Serializable, Cloneable{
+public class User implements Serializable, Comparable<User>, Cloneable{
 	private static final long serialVersionUID = -2579703484224102994L;
 	
 	String name;
@@ -46,5 +46,10 @@ public class User implements Serializable, Cloneable{
 	public User clone() throws CloneNotSupportedException
 	{
 		return (User) super.clone();
+	}
+
+	@Override
+	public int compareTo(User other) {
+		return getName().compareTo(other.getName());
 	}
 }

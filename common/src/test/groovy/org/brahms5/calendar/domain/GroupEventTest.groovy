@@ -5,7 +5,7 @@ import groovy.time.TimeCategory
 
 import org.junit.Test
 
-class GroupEventTest {
+class GroupEventTest extends GroovyTestCase{
 
 	@Test
 	public void testAddTo() {
@@ -13,7 +13,7 @@ class GroupEventTest {
 			final def owner = new User("cbrahms")
 			def users = ["u1", "u2", "u3", "u4", "u5"].collect {
 				return new User(it)
-			}
+			}.toSet()
 			def cal = new Calendar()
 			cal.setUser(owner)
 			
@@ -21,7 +21,7 @@ class GroupEventTest {
 			open.setDescription("Some public event")
 			open.setOwner(owner)
 			open.setTimeInterval(1.days.ago, 1.second.ago)
-			assert open.addTo(cal)
+			open.addTo(cal)
 			
 			def gevents = [ [3.hours.ago, 2.hours.ago], [5.hours.ago, 4.hours.ago], [10.hours.ago, 9.hours.ago] ].collect { 
 				array ->
@@ -34,9 +34,11 @@ class GroupEventTest {
 			}
 			
 			gevents.each {
-				assert it.addTo(cal)
+				it.addTo(cal)
 			}
-			assert !gevents[0].addTo(cal)
+			shouldFail {
+				gevents[0].addTo(cal)
+			}
 			assert open.getEvents().size() == gevents.size()
 			gevents.each {
 				assert it.parent.equals(open)
@@ -53,7 +55,7 @@ class GroupEventTest {
 			final def random = new User("random")
 			def users = ["cbrahms", "u1", "u2", "u3", "u4", "u5"].collect {
 				return new User(it)
-			}
+			}.toSet()
 			def o = new OpenEvent()
 			
 			GroupEvent g = new GroupEvent()
@@ -74,7 +76,7 @@ class GroupEventTest {
 			
 			assert g.getMembers().is(users)
 			assert g.getMembers() == users
-			assert g.getMembers().size == users.size()
+			assert g.getMembers().size() == users.size()
 			assert !g.getDescription().isEmpty()
 			
 			
