@@ -10,6 +10,7 @@ class ServerMain {
 	Server mServer = null;
 	public static main(args) 
 	{
+		System.setProperty("hazelcast.logging.type", "slf4j");
 		new ServerMain().run();
 	}
 	

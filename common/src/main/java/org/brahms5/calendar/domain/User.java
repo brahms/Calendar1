@@ -18,7 +18,7 @@ public class User implements Serializable, Comparable<User>, Cloneable{
 	@Override
 	public String toString()
 	{
-		return String.format("User[name: %s]", getName());
+		return getName();
 	}
 	
 	public User()

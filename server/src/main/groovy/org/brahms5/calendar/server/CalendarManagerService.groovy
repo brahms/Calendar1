@@ -12,10 +12,13 @@ import org.brahms5.calendar.responses.Response
 import org.brahms5.calendar.responses.calendar.manager.ConnectResponse
 import org.brahms5.calendar.responses.calendar.manager.CreateResponse
 import org.brahms5.calendar.responses.calendar.manager.ListResponse
+import org.brahms5.calendar.responses.calendar.manager.RetrieveCalendarResponse
 
 import com.hazelcast.core.HazelcastInstance
 import com.hazelcast.core.IMap
 import com.hazelcast.core.IQueue
+import com.hazelcast.spi.exception.CallTimeoutException;
+import com.hazelcast.core.HazelcastInstanceNotActiveException
 
 @Slf4j
 public class CalendarManagerService implements Runnable{
@@ -44,10 +47,26 @@ public class CalendarManagerService implements Runnable{
 			
 			while(true)
 			{
-				trace "Taking a request from ${mCalendarManagerServiceQueue.getName()}"
-				ARequest request = mCalendarManagerServiceQueue.take()
-				trace "Got request: ${request.toString()}"
-				handleRequest(request)
+				try
+				{
+					
+					trace "Taking a request from ${mCalendarManagerServiceQueue.getName()}"
+					ARequest request = mCalendarManagerServiceQueue.take()
+					trace "Got request: ${request.toString()}"
+					handleRequest(request)
+				}
+				catch (HazelcastInstanceNotActiveException ex)
+				{
+					throw ex;
+				}
+				catch (InterruptedException ex)
+				{
+					throw ex;
+				}
+				catch(ex)
+				{
+					log.warn "Error in CalendarService", ex
+				}
 			}
 			
 		}
@@ -67,21 +86,14 @@ public class CalendarManagerService implements Runnable{
 				trace "Got a ListRequest request"
 				doList(request)
 				break
-			case ConnectRequest:
-				trace "Got a ConnectRequest"
-				doConnect(request)
-				break
 			case CreateRequest:
 				trace "Got a CreateRequest"
 				doCreate(request)
 				break
-			case DisconnectRequest:
-				trace "Got a DisconnectRequest"
-				doDisconnect(request)
-				break
 			case RetrieveCalendarRequest:
 				trace "Got a retrieve calendar request"
 				doRetrieveCalendar(request)
+				break;
 			default:
 				trace "Unknown Request"
 				break
@@ -106,11 +118,11 @@ public class CalendarManagerService implements Runnable{
 				cal.setUser(user)
 				trace "Creating calendar: ${user.getName()}"
 				mCalendarMap.put(user.getName(), cal)
-				offer(new CreateResponse(request.getId(), null), answerQueue)
+				offer new CreateResponse(request.getId(), null), answerQueue
 			}
 			else {
 				trace "Already exists: ${user.getName()}"
-				offer(new CreateResponse(request.getId(), "${user.getName()}'s calendar already exists"), answerQueue)
+				offer new CreateResponse(request.getId(), "${user.getName()}'s calendar already exists"), answerQueue
 			}
 		}
 		finally
@@ -145,9 +157,40 @@ public class CalendarManagerService implements Runnable{
 		
 	}
 	
+	void doRetrieveCalendar(RetrieveCalendarRequest request)
+	{
+		trace "doRetrieveCalendar($request)"
+		trace "Response will be on: " + request.getQueue()
+		
+		final def answerQueue = mFrontend.getQueue(request.getQueue())
+		
+		if(request.getClientUser() != null) 
+		{
+			Calendar cal = mCalendarMap.get(request.getClientUser().getName())
+			
+			if (cal == null) {
+				trace "Calendar for ${request.getClientUser().getName()} does not exit"
+				offer new RetrieveCalendarResponse(request.getId(), "ERROR: Calendaer doesn't exist"), answerQueue
+			}
+			else
+			{
+				trace "Returning calendar for ${request.getClientUser().getName()}"
+				trace cal.toString()
+				def res = new RetrieveCalendarResponse(request.getId(), null)
+				res.setCalendar(cal)
+				offer res, answerQueue
+			}
+		}
+		else {
+			trace "Request has an invalid user"
+			offer(new RetrieveCalendarResponse(request.getId(), "ERROR: Client user is not the same as the subject"), answerQueue);
+		}
+		
+	}
+	
 	void offer(Response response, IQueue answerQueue)
 	{
-		def offered = answerQueue.offer(response, 5, TimeUnit.SECONDS)
+		def offered = answerQueue.offer(response, 15, TimeUnit.SECONDS)
 		if (offered) {
 			trace "Response was offered"
 		}

@@ -13,7 +13,7 @@ public class TimeInterval implements Serializable, Comparable<TimeInterval>, Clo
 	private static final long serialVersionUID = 759086343646516787L;
 	Long timeStart = null;
 	Long timeEnd = null;
-	static DateTimeFormatter sDateFormatter = DateTimeFormat.forStyle("MS");
+	static DateTimeFormatter sDateFormatter = DateTimeFormat.forPattern("M/dd/yyyy hh:mm:ss a");
 	static PeriodFormatter sPeriodFormatter = new PeriodFormatterBuilder()
     .appendYears().appendSuffix(" years ")
     .appendMonths().appendSuffix(" months ")
@@ -107,5 +107,8 @@ public class TimeInterval implements Serializable, Comparable<TimeInterval>, Clo
 	public Interval getInterval()
 	{
 		return (null != getTimeEnd() && null != getTimeStart()) ? new Interval(getTimeStart(), getTimeEnd()) : null;
+	}
+	public boolean containsStartTime(Long time) {
+		return getTimeStart() <= time && getTimeEnd() >= time; 
 	}
 }

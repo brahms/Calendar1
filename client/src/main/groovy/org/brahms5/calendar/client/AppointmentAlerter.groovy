@@ -1,48 +1,71 @@
 package org.brahms5.calendar.client
 
-import groovy.time.TimeCategory;
-import groovy.util.logging.Slf4j;
+import groovy.time.TimeCategory
+import groovy.util.logging.Slf4j
+
 import org.brahms5.calendar.domain.*
 @Slf4j
 class AppointmentAlerter extends Thread {
 
 	final def trace = { msg ->
-		log.trace(msg)
+		log.trace("${mClient.getClientUser()}: $msg")
 	}
-	Client mClient
-	public AppointmentAlerter(Client client) {
+	def mClient
+	public AppointmentAlerter(client) {
 		mClient = client;
 	}
 	
-	Long lastCheck = 0
+	
+	private Long lastCheck = 0
+
 	@Override
 	public void run() {
-		trace "Starting"
-		try 
+		use(TimeCategory)
 		{
-			def currentTime = System.currentTimeMillis();
-			trace "Checking for an event."
-			Calendar calendar = mClient.getClientCalendar()
-			final def events = calendar.getEvents(mClient.getClientUser(), new TimeInterval(lastCheck, currentTime))
-			lastCheck = currentTime
+			lastCheck = System.currentTimeMillis() - (4.minutes.toMilliseconds())
 			
-			if (events.isEmpty() == false) {
-				events.each {
-					alert(it)
+			lastCheck = lastCheck - (lastCheck % 1.second.toMilliseconds())
+			trace "Starting"
+			try 
+			{
+				while(true) 
+				{
+					
+					final def currentTime = System.currentTimeMillis();
+					final def interval = new TimeInterval(lastCheck, currentTime)
+					
+					try
+					{	
+						final Calendar calendar = mClient.getClientCalendar()
+						
+						final def events = calendar.getEventsStartingWithin( interval )
+						lastCheck = currentTime
+						
+						if (events.isEmpty() == false) {
+							events.each {
+								alert(it)
+							}
+						}
+					}
+					catch(ex)
+					{
+						if (ex instanceof InterruptedException) throw ex
+						trace "Got an exception: $ex"
+					}
+					sleep(1.second.toMilliseconds())
 				}
 			}
-			sleep(5000)
+			catch(InterruptedException ex)
+			{
+				
+			}
+			trace "Done"
 		}
-		catch(ex)
-		{
-			trace "Caught an exception"	
-		}
-		trace "Done"
 	}
 	
 	protected void alert(Event event) 
 	{
-		println "Appointment Alert: ${event.debugString()}"
+		println "\n-----------Appointment Alert------------------\n${event.debugString()}\n---------------------------------------"
 	}
 
 	

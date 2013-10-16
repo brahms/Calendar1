@@ -1,9 +1,9 @@
 package org.brahms5.calendar.requests.calendar.manager;
 
 import org.brahms5.calendar.domain.User;
-import org.brahms5.calendar.requests.ARequest;
+import org.brahms5.calendar.requests.calendar.ACalendarRequest;
 
-public class RetrieveCalendarRequest extends ARequest {
+public class RetrieveCalendarRequest extends ACalendarRequest {
 	private static final long serialVersionUID = 8014544221822304004L;
 
 	private String subjectUser;

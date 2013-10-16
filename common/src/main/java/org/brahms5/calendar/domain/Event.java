@@ -15,10 +15,21 @@ public class Event implements Serializable, Comparable<Event>, Cloneable{
 	{
 		private static final long serialVersionUID = 4157523418773776285L;
 		private Event conflictingEvent;
+		private Event me;
 		
-		public ConflictingEventException(Event other)
+		public Event getMe() {
+			return me;
+		}
+
+		public ConflictingEventException(Event me, Event other)
 		{
+			this.setMe(me);
 			this.setConflictingEvent(other);
+		}
+
+		private void setMe(Event me) {
+			this.me = me;
+			
 		}
 
 		public Event getConflictingEvent() {
@@ -28,7 +39,7 @@ public class Event implements Serializable, Comparable<Event>, Cloneable{
 		@Override
 		public String toString()
 		{
-			return String.format("Cannot add due to conflicting event: " + conflictingEvent.toString());
+			return String.format("Cannot add " + getMe() + "  due to conflicting event: " + conflictingEvent.toString());
 		}
 
 		protected void setConflictingEvent(Event conflictingEvent) {
@@ -131,6 +142,11 @@ public class Event implements Serializable, Comparable<Event>, Cloneable{
 	public void addTo(Calendar calendar) throws Exception, ConflictingEventException
 	{
 		log.trace(String.format("addTo(%s) this: %s", calendar, toString()));
+		if (calendar == null)
+		{
+			log.trace("Can't add to a null calendar");
+			throw new UnsupportedOperationException();
+		}
 		switch(getAccessControlMode())
 		{
 		case PRIVATE:
@@ -141,8 +157,8 @@ public class Event implements Serializable, Comparable<Event>, Cloneable{
 				log.trace("Can add because owner of calendar does equal this owner");
 				for (Event event : calendar.getEvents()) {
 					if(this.conflictsWith(event)) {
-						log.trace(String.format("Cannot add because my time interval conflicts with event %s", event));
-						throw new ConflictingEventException(event);
+						log.trace(String.format("Cannot add " + this.toString() + " because my time interval conflicts with event %s", event));
+						throw new ConflictingEventException(this, event);
 					}
 				}
 				log.trace("Adding.");

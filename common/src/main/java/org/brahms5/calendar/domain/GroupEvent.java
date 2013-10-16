@@ -81,9 +81,13 @@ public class GroupEvent extends Event {
 	public void addTo(Calendar calendar) throws Exception,
 			ConflictingEventException {
 		log.trace(String.format("addTo(%s)", calendar));
-		
+		if (calendar == null)
+		{
+			log.trace("Can't add to a null calendar");
+			throw new UnsupportedOperationException();
+		}
 		for (Event event : calendar.getEvents()) {
-			
+			log.trace(String.format("Attemping to add to: %s", event));
 			if (event instanceof OpenEvent && event.contains(this)) {
 				OpenEvent openEvent = (OpenEvent) event;
 				
@@ -95,7 +99,7 @@ public class GroupEvent extends Event {
 								"Can't be added because conflicts with: %s",
 								groupEvent));
 						
-						throw new ConflictingEventException(groupEvent);
+						throw new ConflictingEventException(this, groupEvent);
 					}
 				}
 

@@ -9,6 +9,7 @@ import org.brahms5.calendar.domain.User
 import org.brahms5.calendar.domain.Event.AccessControlMode
 
 import asg.cliche.Command
+import asg.cliche.Param
 
 
 @Slf4j
@@ -19,8 +20,10 @@ public class EventCreationShell extends AShell{
 	boolean canceled = false
 	User mOwner
 
-	@Command
-	public String setEventType(String eventType) {
+	@Command(description="Sets the event's type")
+	public String setEventType(
+		@Param(name="eventType", description="Event type: (PUBLIC, PRIVATE or OPEN)")
+		String eventType) {
 		canceled = false
 		def oldEvent = event
 		switch(eventType.toLowerCase()) {
@@ -52,8 +55,13 @@ public class EventCreationShell extends AShell{
 		event.setOwner(mOwner)
 	}
 	
-	@Command
-	public void setTime(String timeStartString, String timeEndString) {
+	@Command(description="Sets the time interval of the event")
+	public void setTime(
+		@Param(name="timeStart", description="The date/time to start the event")
+		String timeStartString, 
+		
+		@Param(name="timeEnd", description="The date/time to end the event")
+		String timeEndString) {
 		Long timeStart = getTime(timeStartString)
 		Long timeEnd = getTime(timeEndString)
 		if (timeStart != null && timeEnd != null) {
@@ -67,7 +75,7 @@ public class EventCreationShell extends AShell{
 		}
 	}
 
-	@Command
+	@Command(description="Sets the description of the event")
 	public void setDescription(String... description) {
 		canceled = false
 		event.setDescription((description as List).join(" "))
@@ -75,7 +83,7 @@ public class EventCreationShell extends AShell{
 	}
 
 	
-	@Command
+	@Command(description="Resets the event to a null event")
 	public void clear()
 	{
 		canceled = false
@@ -84,7 +92,7 @@ public class EventCreationShell extends AShell{
 		println status()
 	}
 
-	@Command
+	@Command(description="Prints out the current event data")
 	public String status() {
 		return isCanceled() ? "Canceled" : """\
 Event: 
@@ -92,7 +100,7 @@ ${event.debugString()}
 """
 	}
 
-	@Command
+	@Command(description="Cancels the current event")
 	public String cancel() {
 		canceled = true
 		return "You have to type exit to stop the shell"

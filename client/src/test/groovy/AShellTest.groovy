@@ -15,6 +15,8 @@ class AShellTest extends AShell{
 		assert null != getTime("2013-02-02 23:23")
 		assert null != getTime("12/12/1986")
 		assert null != getTime("12/12/1986 23:23")
+		assert null != getTime("23:23")
+		assert null != getTime("10 am")
 	}
 
 }

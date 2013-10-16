@@ -2,6 +2,7 @@ package org.brahms5.calendar.client
 
 import groovy.util.logging.Slf4j
 
+import org.brahms5.calendar.domain.Event
 import org.brahms5.calendar.domain.GroupEvent
 import org.brahms5.calendar.domain.User
 
@@ -13,11 +14,11 @@ import asg.cliche.ShellFactory
 @Slf4j
 class CalendarServiceShell implements ShellDependent{
 	final def trace = {
-		str -> log.trace str
+		str -> log.trace "$mUser: $str"
 	}
 	
 	final def warn = {
-		str -> log.warn str
+		str -> log.warn "$mUser: $str"
 	}
 	Shell mShell
 	Client mClient
@@ -31,7 +32,7 @@ class CalendarServiceShell implements ShellDependent{
 	
 	
 	
-	@Command
+	@Command(description="Create a public, private, or open event.")
 	public String createEvent()
 	{
 		log.trace "Creating event shell"
@@ -54,7 +55,7 @@ class CalendarServiceShell implements ShellDependent{
 			return "Canceled"
 		}
 	}
-	@Command
+	@Command(description="Creates a group event")
 	public String createGroupEvent()
 	{
 		log.trace "Creating group event shell"
@@ -79,8 +80,8 @@ class CalendarServiceShell implements ShellDependent{
 	}
 	
 	
-	@Command
-	public String retrieveSchedule()
+	@Command(description="Retrieves a user's schedule")
+	public void retrieveSchedule()
 	{
 		def shell = new RetrieveScheduleShell(mUser)
 		ShellFactory.createSubshell("Retrieve Schedule", mShell, "", shell).commandLoop()
@@ -88,17 +89,35 @@ class CalendarServiceShell implements ShellDependent{
 		if (!shell.isCanceled()) {
 			try
 			{
-				return mClient.retrieveSchedule(shell.getUserName(), shell.getTimeInterval())
+				def list =  mClient.retrieveSchedule(shell.getUserName(), shell.getTimeInterval())
+				
+				list.each {
+					Event event -> println "\n---------------------------------------------------------------------\n${event.debugString()}\n-----------------------------------------------------------------\n"
+				}
 			}
 			catch (ex) {
-				return "ERROR: " + ex.toString()
+				println "ERROR: " + ex.getMessage()
 			}
 		}
 		else {
-			return "Canceled"
+			println "Canceled"
 		}
 	}
-
+	
+	
+	@Command(description="Dumps the state of your current calendar")
+	public String dump()	{
+		if (mClient == null) return "Please log in";
+		
+		try
+		{
+			return mClient.dump()
+		}
+		catch(ex)
+		{
+			return "ERROR: $ex"
+		}
+	}
 	
 	@Override
 	public void cliSetShell(Shell shell) {

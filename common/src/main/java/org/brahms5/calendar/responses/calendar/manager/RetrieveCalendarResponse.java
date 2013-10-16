@@ -16,4 +16,9 @@ public class RetrieveCalendarResponse extends Response{
 		this.calendar = calendar;
 	}
 
+	@Override
+	public String toString()
+	{
+		return String.format("RetrieveCalendarResponse[calendar user: %s, events: %s]", getCalendar(), getCalendar().getEvents());
+	}
 }

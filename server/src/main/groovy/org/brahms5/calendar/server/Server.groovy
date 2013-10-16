@@ -39,15 +39,18 @@ class Server {
 
 	ICalendarDao mCalendarDao
 	public Server() {
+		println "Starting up"
 		log.trace "Constructor"
 
 		log.trace "Getting frontend cluster instance"
 		def frontendConfig = new Config();
 		frontendConfig.getGroupConfig().setName(Constants.CLUSTER_FRONTEND)
+		frontendConfig.setProperty("hazelcast.logging.type", "slf4j");
 		mHazlecastFrontend = Hazelcast.newHazelcastInstance(frontendConfig);
 
 		log.trace "Getting backend cluster instance"
 		def backendConfig = new Config()
+		backendConfig.setProperty("hazelcast.logging.type", "slf4j");
 		backendConfig.getGroupConfig().setName(Constants.CLUSTER_BACKEND)
 		def calendarMapConfig = new MapConfig()
 		calendarMapConfig.setName(Constants.MAP_CALENDARS)
@@ -105,6 +108,7 @@ class Server {
 		mCalendarServiceThread.setDaemon(true)
 		mCalendarServiceThread.start()
 		
+		println "Started!"
 
 	}
 
@@ -153,7 +157,7 @@ CalendarService Requests Served: ${mCalendarService.getRequestsServed()}
 
 Calendars in DB: ${mCalendarDao.count()}
 
-Calendars in CalendarMap (${connectMapEntrySet.size()}:
+Calendars in CalendarMap (${connectMapEntrySet.size()} Total):
 ${builder.toString()}
 
 Clients logged in:

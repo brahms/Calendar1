@@ -17,6 +17,7 @@ public class ClientMain implements ShellDependent{
 	User mUser = null;
 	public static void main(String[] args) throws IOException {
 		new ClientMain().run();
+		System.setProperty("hazelcast.logging.type", "slf4j");
 	}
 	
 	public void run() throws IOException
@@ -32,7 +33,7 @@ public class ClientMain implements ShellDependent{
 	 * 
 	 */
 	
-	@Command
+	@Command(description="Exits the program")
 	public void exit()
 	{
 		mClient?.shutdown();
@@ -41,7 +42,7 @@ public class ClientMain implements ShellDependent{
 	}
 	
 	// Other stuff
-	@Command
+	@Command(description="Log into the calendar cluster")
 	public String login(String user)
 	{
 		if (mClient == null)
@@ -59,7 +60,7 @@ public class ClientMain implements ShellDependent{
 	
 	// Calendar Manager commands
 	
-	@Command
+	@Command(description="List the calendars in the cluster")
 	public String listCalendars()
 	{
 		if (mClient == null) return "Please log in"
@@ -78,8 +79,8 @@ public class ClientMain implements ShellDependent{
 			return "ERROR"
 		}
 	}
-
-	@Command
+	
+	@Command(description="Show who's logged into the cluster")
 	public String whosLoggedIn()
 	{
 		if (mClient == null) return "Please log in"
@@ -99,7 +100,7 @@ public class ClientMain implements ShellDependent{
 		}
 	}
 	
-	@Command
+	@Command(description="Use calendar services")
 	public String calendarServices()
 	{
 		if (mClient == null) return "Please log in"
@@ -115,13 +116,27 @@ public class ClientMain implements ShellDependent{
 		}
 	}
 	
-	@Command 
+	@Command(description="Create a calendar for a given user")
 	public String createCalendar(String user)
 	{
 		if (mClient == null) return "Please log in"
 		try
 		{
 			return mClient.createCalendar(user)
+		}
+		catch(ex)
+		{
+			return "ERROR: $ex"
+		}
+	}
+	
+	@Command(description="Dumps the state of your current calendar")
+	public String dump()	{
+		if (mClient == null) return "Please log in";
+		
+		try
+		{
+			return mClient.dump()
 		}
 		catch(ex)
 		{

@@ -26,13 +26,16 @@ import com.hazelcast.client.config.ClientConfig
 import com.hazelcast.core.HazelcastInstance
 import com.hazelcast.core.IQueue
 import com.hazelcast.core.IdGenerator
+import com.hazelcast.core.LifecycleEvent
+import com.hazelcast.core.LifecycleListener
 import com.hazelcast.core.Message
 import com.hazelcast.core.MessageListener
 import com.hazelcast.core.MultiMap
+import com.hazelcast.core.LifecycleEvent.LifecycleState
 
 
 @Slf4j
-public class Client implements MessageListener<CalendarEvent>
+public class Client implements MessageListener<CalendarEvent>, LifecycleListener
 {	
 	/** This is the magic sauce that makes our communication with the server possible **/
 	HazelcastInstance mHazlecast = null;
@@ -68,11 +71,20 @@ public class Client implements MessageListener<CalendarEvent>
 	
 	/** This tells us if the client calendar's is dirty, since
 	 * it gets updated on a different thread, we make it atomic **/
-	AtomicBoolean mClientIsDirty = new AtomicBoolean(true)
+	AtomicBoolean mClientIsDirty = new AtomicBoolean(false)
 	
-	/** A shortcut to log stuff **/
+	AppointmentAlerter mAlerter = new AppointmentAlerter(this);
+	
+	String mLifecycleRegistrationString = null
+	
+	boolean mIsShutdown = false
+	
 	final def trace = {
-		str -> log.trace str
+		str -> log.trace "${getClientUser()}: $str"
+	}
+	
+	final def warn = {
+		str -> log.warn "${getClientUser()}: $str"
 	}
 	
 	
@@ -84,6 +96,7 @@ public class Client implements MessageListener<CalendarEvent>
 	{
 		mClientUser = new User(username)
 		trace "Constructor"
+		println "Ready"
 	}
 	
 	
@@ -92,7 +105,11 @@ public class Client implements MessageListener<CalendarEvent>
 	{
 		def cfg = new ClientConfig();
 		cfg.getGroupConfig().setName(Constants.CLUSTER_FRONTEND)
+		cfg.getProperties().put("hazelcast.logging.type", "slf4j")
+		
+		println "Logging in."
 		mHazlecast = HazelcastClient.newHazelcastClient(cfg);
+		mLifecycleRegistrationString = mHazlecast.getLifecycleService().addLifecycleListener(this);
 		
 		//
 		// Generate the unique identifier for our client
@@ -108,49 +125,92 @@ public class Client implements MessageListener<CalendarEvent>
 		mHazlecast.getTopic(Constants.TOPIC_CALENDAR_EVENTS).addMessageListener(this)
 		mUserMap = mHazlecast.getMultiMap(Constants.MAP_USERS)
 		mUserMap.put(mClientUser.getName(), mAnswerQueueName)
+		
 		log.info "Answer queue is: $mAnswerQueueName"
+		
+		def user = listCalendars().find {
+			return mClientUser.equals(it)
+		}
+		
+		if (user != null)
+		{
+			trace "Starting Alerter"
+			mAlerter.start();
+		}
+		else
+		{
+			println "$mClientUser doesn't have an existing calendar, you should create one!"
+		}
 	}
 	
 	/**
 	 * Shuts down all our hazelcast stuff
 	 * @return
 	 */
-	public shutdown()
+	public synchronized shutdown()
 	{
-		try
-		{	
-			log.info "Destroying answer queue: ${mAnswerQueueName}"
-			mAnswerQueue?.destroy()
-		}
-		catch(ex)
+		log.trace "Trying to shutdown()"
+		if (mHazlecast != null && mIsShutdown == false)
 		{
-			log.warn "Error destroying queue", ex.toString()
-		}
-		try
-		{
-			log.info "Removing myself from the topic"
-			mHazlecast.getTopic(Constants.TOPIC_CALENDAR_EVENTS).removeMessageListener(this);
-		}
-		catch(ex)
-		{
-			log.warn "Error removing from topic", ex.toString()
-		}
-		try
-		{
-			trace "Destroy multi map record for ${mClientUser.getName()}, ${mAnswerQueueName}"
-			boolean b = mUserMap?.remove(mClientUser.getName(), mAnswerQueueName)
-			if (b) {
-				trace "Removed"
+			
+			try
+			{
+				log.info "Shutting down lifecycle listener"
+				mHazlecast.getLifecycleService().removeLifecycleListener(mLifecycleRegistrationString);
 			}
-			else {
-				trace "Failed to remove"
+			catch (ex)
+			{
+				
 			}
+			try
+			{
+				log.info "Shutting down alerter thread."
+				
+				if (mAlerter?.isAlive()) mAlerter.interrupt();
+			}
+			catch(ex)
+			{
+				
+			}
+			try
+			{
+				log.info "Destroying answer queue: ${mAnswerQueueName}"
+				mAnswerQueue?.destroy()
+			}
+			catch(ex)
+			{
+			}
+			try
+			{
+				log.info "Removing myself from the topic"
+				mHazlecast.getTopic(Constants.TOPIC_CALENDAR_EVENTS).removeMessageListener(this);
+			}
+			catch(ex)
+			{
+				
+			}
+			try
+			{
+				trace "Destroy multi map record for ${mClientUser.getName()}, ${mAnswerQueueName}"
+				boolean b = mUserMap?.remove(mClientUser.getName(), mAnswerQueueName)
+				if (b) {
+					trace "Removed"
+				}
+				else {
+					trace "Failed to remove"
+				}
+			}
+			catch (ex)
+			{
+				
+			}
+			mHazlecast?.getLifecycleService()?.shutdown()
+			mHazlecast = null;
 		}
-		catch (ex)
+		else
 		{
-			log.warn ("Error removing multimap entry", ex)
+			log.trace "Already shutdown"
 		}
-		mHazlecast?.getLifecycleService()?.shutdown()
 	}
 	
 	/**
@@ -183,15 +243,25 @@ public class Client implements MessageListener<CalendarEvent>
 		User user = new User()
 		user.setName(username)
 		
-		trace("Clearing answer queue: $mAnswerQueueName")
-		mAnswerQueue.clear();
 
 		final def req = new CreateRequest(mUuid, UUID.randomUUID().toString(), mClientUser)
 		req.setSubjectUser(new User(username))
 		Response resp = sendRequest(req, mCalendarManagerQueue)
-		trace("Received response: $resp")
-		return resp.getError() ?: "Success!"
 		
+		if (mAlerter != null && mAlerter.isAlive() == false && mClientUser.equals(req.getSubjectUser())) {
+			trace "Starting my own appointment alerter"
+			mAlerter.start();
+		}
+		
+		return "Success"
+		
+	}
+	
+	public String dump()
+	{
+		if (mAlerter.isAlive()) {
+			return getClientCalendar().debugString();
+		}
 	}
 	
 	/**
@@ -226,8 +296,7 @@ public class Client implements MessageListener<CalendarEvent>
 		req.setTimeInterval(timeInterval)
 		req.validate()
 		RetrieveScheduleResponse resp = (RetrieveScheduleResponse) sendRequest(req, mCalendarServiceQueue)
-		trace("Received response: $resp")
-		throw new Exception(resp.getError())
+
 		return resp.getEvents();
 	}
 	
@@ -245,7 +314,7 @@ public class Client implements MessageListener<CalendarEvent>
 		
 		ScheduleEventResponse resp = sendRequest(req, mCalendarServiceQueue)
 		trace("Received response: $resp")
-		return resp.getError() ?: "Success!"
+		return  "Success!"
 		
 	}
 	
@@ -264,24 +333,29 @@ public class Client implements MessageListener<CalendarEvent>
 		
 		ScheduleEventResponse resp = sendRequest(req, mCalendarServiceQueue)
 		trace("Received response: $resp")
-		return resp.getError() ?: "Success!"
+		return "Success!"
 		
 	}
 	
 	
-	synchronized Response sendRequest(ARequest req, IQueue queue)
+	synchronized Response sendRequest(ARequest req, IQueue queue) throws Exception
 	{
 		trace("Created request with request client id of ${req.getUuid()}")
 		trace("Created request with request id of ${req.getId()}")
 		trace("Offering request to queue: " + queue.getName())
 		queue.offer(req)
 		trace("Request taken by: ${queue.getName()}")
+		trace "Clearing answer queue"
 		trace("Taking response from ${mAnswerQueue.getName()}...")
-		Response resp = mAnswerQueue.poll(2, TimeUnit.SECONDS)
+		Response resp = mAnswerQueue.poll(15, TimeUnit.SECONDS)
 		
 		if (resp == null) {
 			log.warn("Timed out waiting for a response on ${mAnswerQueue.getName()}")
 			throw new Exception("Response timed out")
+		}
+		if (resp.getError())
+		{
+			throw new Exception(resp.getError());
 		}
 		trace("Received $resp")
 		return resp
@@ -290,32 +364,57 @@ public class Client implements MessageListener<CalendarEvent>
 	@Override
 	public void onMessage(Message<CalendarEvent> message) {
 		CalendarEvent event = (CalendarEvent) message.getMessageObject()
-		trace "Calendar Event: $message"
 		if (mClientUser.equals(event.getSubjectUser())) {
 			trace "Client Calendar is dirty"
+			println "\nYour calendar has been updated\n"
 			mClientIsDirty.set(true)
-		}
-		else if(subjectCalendar != null && subjectCalendar.getUser().equals(event.getSubjectUser())) {
-			trace "Subject Calendar is dirty"
-			mSubjectIsDirty.set(true)
 		}
 	}
 	
-	public Calendar retrieveCalendar(User user) 
+	protected Calendar retrieveCalendar(User user) 
 	{
 		RetrieveCalendarRequest request = new RetrieveCalendarRequest(mUuid, UUID.randomUUID().toString(), mClientUser)
 		
-		def resp = (RetrieveCalendarResponse) sendRequest(request, )
+		def resp = (RetrieveCalendarResponse) sendRequest(request, mCalendarManagerQueue)
+		
+		if (resp.getError() != null) {
+			throw new Exception(resp.getError());
+		}
+		
+		return resp.getCalendar();
+		
 	}
 	public Calendar getClientCalendar()
 	{
-		while(clientCalendar == null || mClientIsDirty.getAndSet(false)) {
-			clientCalendar = retrieveCalendar(mClientUser)
+		while(mClientIsDirty.getAndSet(false) || clientCalendar == null) {
+			try {
+				trace "retrieveCalendar"
+				clientCalendar = retrieveCalendar(mClientUser)
+			}
+			catch (ex)
+			{
+				log.warn "Error trying to grab the calendar: " + ex
+				clientCalendar = null;
+			}
 		}
+		return clientCalendar
 	}
 	
 	public User getClientUser()
 	{
 		return mClientUser
+	}
+
+
+	@Override
+	public void stateChanged(LifecycleEvent event) {
+		trace "Lifecycle changed: $event"
+		switch(event.getState()) {
+			case LifecycleState.SHUTTING_DOWN:
+			case LifecycleState.SHUTDOWN:
+				mIsShutdown = true;
+				System.exit(1)
+		}
+		
 	}
 }

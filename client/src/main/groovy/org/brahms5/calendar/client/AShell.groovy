@@ -12,13 +12,21 @@ import org.joda.time.format.DateTimeParser
 abstract class AShell {
 	DateTimeParser[] parsers = [
 		DateTimeFormat.forPattern( "yyyy-MM-dd HH:mm" ).getParser(),
+		DateTimeFormat.forPattern( "yyyy-MM-dd hh:mm a" ).getParser(),
+		DateTimeFormat.forPattern( "yyyy-MM-dd hh:mma" ).getParser(),
 		DateTimeFormat.forPattern( "yyyy-MM-dd" ).getParser(),
 		DateTimeFormat.forPattern( "MM/dd/yy" ).getParser(),
 		DateTimeFormat.forPattern( "MM/dd/yy HH:mm" ).getParser(),
+		DateTimeFormat.forPattern( "MM/dd/yy hh:mm a" ).getParser(),
+		DateTimeFormat.forPattern( "MM/dd/yy hh:mma" ).getParser(),
 		DateTimeFormat.forPattern( "yyyy/MM/dd" ).getParser(),
 		DateTimeFormat.forPattern( "yyyy/MM/dd HH:mm" ).getParser(),
+		DateTimeFormat.forPattern( "yyyy/MM/dd hh:mm a" ).getParser(),
+		DateTimeFormat.forPattern( "yyyy/MM/dd hh:mma" ).getParser(),
 		DateTimeFormat.forPattern( "MM/dd/yyyy" ).getParser(),
-		DateTimeFormat.forPattern("MM/dd/yyyy HH:mm").getParser()
+		DateTimeFormat.forPattern("MM/dd/yyyy HH:mm").getParser(),
+		DateTimeFormat.forPattern("MM/dd/yyyy hh:mm a").getParser(),
+		DateTimeFormat.forPattern("MM/dd/yyyy hh:mma").getParser()
 	];
 	DateTimeFormatter dateParser = new DateTimeFormatterBuilder().append( null, parsers ).toFormatter();
 

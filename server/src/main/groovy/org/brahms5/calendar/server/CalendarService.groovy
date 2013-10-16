@@ -13,10 +13,12 @@ import org.brahms5.calendar.responses.calendars.RetrieveScheduleResponse
 import org.brahms5.calendar.responses.calendars.ScheduleEventResponse
 
 import com.hazelcast.core.HazelcastInstance
+import com.hazelcast.core.HazelcastInstanceNotActiveException
 import com.hazelcast.core.ILock
 import com.hazelcast.core.IMap
 import com.hazelcast.core.IQueue
 import com.hazelcast.core.ITopic
+import com.hazelcast.spi.exception.CallTimeoutException;
 @Slf4j
 class CalendarService implements Runnable {
 	IQueue mCalendarServiceQueue
@@ -48,10 +50,26 @@ class CalendarService implements Runnable {
 			
 			while(true)
 			{
-				trace "Taking a request from ${mCalendarServiceQueue.getName()}"
-				ACalendarRequest request = mCalendarServiceQueue.take()
-				trace "Got request: ${request.toString()}"
-				handleRequest(request)
+				try
+				{
+					
+					trace "Taking a request from ${mCalendarServiceQueue.getName()}"
+					ACalendarRequest request = mCalendarServiceQueue.take()
+					trace "Got request: ${request.toString()}"
+					handleRequest(request)
+				}
+				catch (HazelcastInstanceNotActiveException ex)
+				{
+					throw ex;
+				}
+				catch (InterruptedException ex)
+				{
+					throw ex;
+				}
+				catch(ex)
+				{
+					log.warn "Error in CalendarService", ex
+				}
 			}
 			
 		}
@@ -120,11 +138,19 @@ class CalendarService implements Runnable {
 					case AccessControlMode.PUBLIC:
 					case AccessControlMode.PRIVATE:
 					case AccessControlMode.OPEN:
-						def cal = mCalendarMap.get(event.getOwner().getName())
+						final Calendar cal = mCalendarMap.get(event.getOwner().getName())
 						trace "Trying to add to $cal"
 						event.addTo(cal)
 						mCalendarMap.replace(event.getOwner().getName(), cal)
 						trace "Updated map"
+						trace "Publishing event"
+						def calendarEvent = new CalendarEvent()
+						calendarEvent.setClientUser(request.getClientUser())
+						calendarEvent.setSubjectUser(cal.getUser())
+						calendarEvent.setClientUuid(request.getUuid())
+						calendarEvent.setTimestamp(System.currentTimeMillis())
+						mCalendarEvents.publish(calendarEvent)
+						trace "Event published"
 						break;
 					case AccessControlMode.GROUP:
 						

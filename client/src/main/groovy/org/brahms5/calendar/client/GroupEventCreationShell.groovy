@@ -26,21 +26,27 @@ public class GroupEventCreationShell extends EventCreationShell {
 	}
 	
 	
-	@Command
+	@Command(description="Adds an array of users to this group event")
 	public void addUser(String... usernames) {
-		(event as GroupEvent).getMembers().addAll(usernames);
+		def users = usernames.collect {
+			return new User(it)
+		}
+		(event as GroupEvent).getMembers().addAll(users);
 		canceled = false
 		println status()
 	}
 
-	@Command
+	@Command(description="Removes an array of users to this group event")
 	public void removeUser(String... usernames) {
-		(event as GroupEvent).getMembers().removeAll(usernames);
+		def users = usernames.collect {
+			return new User(it)
+		}
+		(event as GroupEvent).getMembers().removeAll(users);
 		canceled = false
 		println status()
 	}
 
-	@Command
+	@Command(description="Removes all currently assigned users to this group event")
 	public void clearUsers() {
 		(event as GroupEvent).getMembers().clear();
 		canceled = false
