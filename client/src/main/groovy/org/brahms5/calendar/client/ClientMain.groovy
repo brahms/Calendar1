@@ -15,17 +15,20 @@ public class ClientMain implements ShellDependent{
 	Client mClient = null;
 	Shell mShell = null;
 	User mUser = null;
+	boolean mMedusa = false
 	public static void main(String[] args) throws IOException {
-		new ClientMain().run();
+		new ClientMain().run(null != args.find{
+			return it.equals("medusa")
+		});
 		System.setProperty("hazelcast.logging.type", "slf4j");
 	}
 	
-	public void run() throws IOException
+	public void run(boolean medusa) throws IOException
 	{
+		mMedusa = medusa
 		createShutDownHook()
         ShellFactory.createConsoleShell("CalendarClient", "", this)
             .commandLoop()
-			MapProxyImpl bla;
 	}
 	
 	/*
@@ -48,7 +51,7 @@ public class ClientMain implements ShellDependent{
 		if (mClient == null)
 		{
 			mClient = new Client(user)
-			mClient.connect();
+			mClient.connect(mMedusa);
 			mUser = new User(user)
 			return "Logged in"
 		}

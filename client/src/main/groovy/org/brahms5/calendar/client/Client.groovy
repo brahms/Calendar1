@@ -101,11 +101,21 @@ public class Client implements MessageListener<CalendarEvent>, LifecycleListener
 	
 	
 	/** Connects to the hazelcast frontend cluster **/
-	public connect()
+	public connect(boolean medusa)
 	{
 		def cfg = new ClientConfig();
 		cfg.getGroupConfig().setName(Constants.CLUSTER_FRONTEND)
 		cfg.getProperties().put("hazelcast.logging.type", "slf4j")
+		
+		if (medusa)
+		{
+			println "Using TCP/IP cluster configuration for medusa"
+			(1..19).each {
+				def addr = "compute-0-${it}.local:5701"
+				println "\tAdding $addr to config"
+				cfg.addAddress(addr)
+			}
+		}
 		
 		println "Logging in."
 		mHazlecast = HazelcastClient.newHazelcastClient(cfg);

@@ -11,15 +11,17 @@ class ServerMain {
 	public static main(args) 
 	{
 		System.setProperty("hazelcast.logging.type", "slf4j");
-		new ServerMain().run();
+		new ServerMain().run(null != args.find({
+			it.equals("medusa")
+		}));
 	}
 	
-	public run()
+	public run(boolean medusa)
 	{
-		log.trace "run()"
+		log.trace "run($medusa)"
 		try
 		{
-			mServer = new Server();
+			mServer = new Server(medusa);
 			createShutDownHook()
 		}
 		catch(ex)

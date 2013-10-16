@@ -9,7 +9,9 @@ import org.brahms5.commons.Constants
 import org.springframework.jdbc.datasource.DriverManagerDataSource
 
 import com.hazelcast.config.Config
+import com.hazelcast.config.JoinConfig
 import com.hazelcast.config.MapConfig
+import com.hazelcast.config.NetworkConfig
 import com.hazelcast.config.MapConfig.InMemoryFormat
 import com.hazelcast.core.Hazelcast
 import com.hazelcast.core.HazelcastInstance
@@ -38,7 +40,7 @@ class Server {
 	CalendarService mCalendarService
 
 	ICalendarDao mCalendarDao
-	public Server() {
+	public Server(boolean medusa) {
 		println "Starting up"
 		log.trace "Constructor"
 
@@ -46,7 +48,6 @@ class Server {
 		def frontendConfig = new Config();
 		frontendConfig.getGroupConfig().setName(Constants.CLUSTER_FRONTEND)
 		frontendConfig.setProperty("hazelcast.logging.type", "slf4j");
-		mHazlecastFrontend = Hazelcast.newHazelcastInstance(frontendConfig);
 
 		log.trace "Getting backend cluster instance"
 		def backendConfig = new Config()
@@ -56,6 +57,37 @@ class Server {
 		calendarMapConfig.setName(Constants.MAP_CALENDARS)
 		calendarMapConfig.setInMemoryFormat(InMemoryFormat.OBJECT)
 		backendConfig.addMapConfig(calendarMapConfig)
+		
+		if (medusa)
+		{
+			NetworkConfig frontendNetwork = frontendConfig.getNetworkConfig()
+			NetworkConfig backendNetwork = backendConfig.getNetworkConfig()
+			JoinConfig frontendJoin = frontendNetwork.getJoin()
+			JoinConfig backendJoin = backendNetwork.getJoin()
+			
+			frontendJoin.getMulticastConfig().setEnabled(false)
+			backendJoin.getMulticastConfig().setEnabled(false)
+			frontendJoin.getTcpIpConfig().setEnabled(true)
+			backendJoin.getTcpIpConfig().setEnabled(true)
+			println "Using TCP/IP configuration for medusa cluster"
+			(1..19).each {
+				println "Adding cluster member $it"
+				def frontendAddr = "compute-0-${it}.local:5701"
+				def backendAddr = "compute-0-${it}.local:5702"
+				
+				println "\tFrontend addr: $frontendAddr"
+				println "\tBackend addr: $backendAddr"
+				
+				frontendJoin.getTcpIpConfig().addMember(frontendAddr)
+				backendJoin.getTcpIpConfig().addMember(backendAddr)
+				
+			}
+		}
+		
+		println "Starting frontend instance"
+		mHazlecastFrontend = Hazelcast.newHazelcastInstance(frontendConfig);
+		
+		println "Starting backend instance"
 		mHazlecastBackend = Hazelcast.newHazelcastInstance(backendConfig)
 
 
