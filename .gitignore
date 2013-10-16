@@ -49,3 +49,6 @@ local.properties
 *.log
 
 *.db
+
+*.zip
+*.tgz
