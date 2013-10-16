@@ -30,6 +30,33 @@ How To Run
 ----------
 This project uses gradle to build the software. Simply run gradle (all you need installed is JDK 7) by using the command: `./gradlew installApp` from the source's root folder. You need an internet connection for this to work, but if you do it will automatically pull down its dependencies before compilation.
 
+The final output after building should look like this
+
+    $ ./gradlew installApp
+    :common:compileJava
+    :common:compileGroovy
+    :common:processResources UP-TO-DATE
+    :common:classes
+    :common:jar
+    :client:compileJava UP-TO-DATE
+    :client:compileGroovy
+    :client:processResources
+    :client:classes
+    :client:jar
+    :client:startScripts
+    :client:installApp
+    :server:compileJava
+    :server:compileGroovy
+    :server:processResources
+    :server:classes
+    :server:jar
+    :server:startScripts
+    :server:installApp
+
+    BUILD SUCCESSFUL
+
+    Total time: 46.66 secs
+
 The server installation folder is then located in `./server/build/install/server/` and can be executed by calling `bin/server` or on windows `./bin/server.bat`
 
 The same can likewise be said for the client, which is located at `/client/build/install/client/` and can be called using `./bin/client` or on windows `./bin/client.bat`.
@@ -72,8 +99,10 @@ Here's an example of starting up the client
 
 Tracing logs are located in the cwd in a file called `client.log`
 
+Before you can do anything with the client program you need to login using the `l` or `login` command followed by your username. At which point the program will tell you to create a calendar which you can do using the command `cc` or `create-calendar` followed by your username again.
+
 Source Code
 -----------
-All source code is written in either `Groovy` or `Java`. There are three separatre projects `:common`, `:server`, and `:client`. `:common` contains source code used by both the server and client projects, such as the serializable request/response pojos used in the queue system as well the domain objects `Calendar`, `Event`, etc.
+All source code is written in either `Groovy` or `Java`. There are three separate projects `:common`, `:server`, and `:client`. `:common` contains source code used by both the server and client projects, such as the serializable request/response pojos used in the queue system as well the domain objects `Calendar`, `Event`, etc.
 
 
